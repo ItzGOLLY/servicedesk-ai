@@ -27,15 +27,22 @@ Built for **BCSE408L – Cloud Computing**, School of Computer Science Engineeri
 
 ## Project Status
 
-This repository is under active development across three review milestones. The table below reflects what is **actually built and verified**, not what is planned.
+The table below reflects what is **actually built and verified**, not what is planned.
 
 | Milestone | Date | Focus | Status |
 |---|---|---|---|
-| **R1** | 20 August | Requirements, SRS, use cases, UI mockups | In progress |
-| **R2** | 17 September | Architecture, database, REST APIs, auth, core modules, initial deployment | Not started |
-| **R3 / Final Demo** | 15 October | Complete application, testing, reports, live URL, documentation | Not started |
+| **R1** | 20 August | Requirements, SRS, use cases, UI mockups | Complete |
+| **R2** | 17 September | Architecture, database, REST APIs, auth, core modules | Complete except deployment |
+| **R3 / Final Demo** | 15 October | Complete application, testing, reports, live URL | Application and tests complete; deployment outstanding |
 
-**Nothing in this README should be read as a claim that a feature is deployed.** Feature descriptions below describe the designed system; the status table above is the source of truth for what exists.
+**Verified by running it, not by assuming:**
+
+- Backend typecheck passes; frontend builds under strict TypeScript
+- Migrations apply cleanly to a real PostgreSQL instance
+- **92 automated tests pass (92/92)** against a real database — see [`docs/TESTING.md`](docs/TESTING.md)
+- All three roles exercised end to end in a browser: registration, ticket creation with live AI classification, the agent AI draft-and-edit flow, admin dashboards, and the 375 px mobile layout
+
+**Not yet done:** the application is **not deployed**. No hosting account has been provisioned, so there is no live URL. [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) documents every step; [`docs/FINAL_COMPLIANCE_CHECKLIST.md`](docs/FINAL_COMPLIANCE_CHECKLIST.md) records exactly what is and is not complete.
 
 ---
 
@@ -247,7 +254,16 @@ Responses follow one shape: `{ success, data, meta }` on success and `{ success:
 cd backend && npm test
 ```
 
-Coverage targets authentication, authorisation boundaries, ticket CRUD and lifecycle transitions, AI failure handling, and API error cases. Results are recorded in [`docs/TESTING.md`](docs/TESTING.md).
+**92 tests, all passing**, run against a real PostgreSQL database using the same migration files as production — not mocks.
+
+| Suite | Tests | Covers |
+|---|---|---|
+| `auth.test.ts` | 13 | Registration, login, password storage, token handling, deactivation |
+| `authorization.test.ts` | 26 | Every role boundary, called directly against the API with the wrong role |
+| `tickets.test.ts` | 33 | CRUD, assignment, lifecycle transitions, messages, search and pagination |
+| `ai.test.ts` | 20 | Lifecycle rules, fallback classifier, and AI failure handling |
+
+Two results worth noting: **ticket creation still succeeds when AI classification throws**, and **generating an AI draft creates zero customer-visible messages**. Full case-by-case results in [`docs/TESTING.md`](docs/TESTING.md).
 
 ---
 
@@ -261,17 +277,20 @@ Deployment procedure, environment configuration, CORS setup, build and start com
 
 | Document | Contents |
 |---|---|
-| [`docs/SRS.md`](docs/SRS.md) | Software Requirements Specification |
+| [`docs/SRS.md`](docs/SRS.md) | Software Requirements Specification — 14 sections |
 | [`docs/REQUIREMENTS_TRACEABILITY.md`](docs/REQUIREMENTS_TRACEABILITY.md) | Every course requirement mapped to its implementation, test and demo step |
-| [`docs/SYSTEM_ARCHITECTURE.md`](docs/SYSTEM_ARCHITECTURE.md) | Application architecture and module design |
-| [`docs/CLOUD_ARCHITECTURE.md`](docs/CLOUD_ARCHITECTURE.md) | Cloud components, data flow, auth flow, deployment flow |
+| [`docs/SYSTEM_ARCHITECTURE.md`](docs/SYSTEM_ARCHITECTURE.md) | Module design, request lifecycle, key decisions |
+| [`docs/CLOUD_ARCHITECTURE.md`](docs/CLOUD_ARCHITECTURE.md) | Cloud components, data flow, auth flow, AI flow, deployment flow |
 | [`docs/DATABASE_DESIGN.md`](docs/DATABASE_DESIGN.md) | Entities, relationships, keys, indexes, constraints, ER diagram |
-| [`docs/API_DOCUMENTATION.md`](docs/API_DOCUMENTATION.md) | Endpoint reference |
-| [`docs/TESTING.md`](docs/TESTING.md) | Test cases, expected and actual results |
-| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Deployment guide |
+| [`docs/API_DOCUMENTATION.md`](docs/API_DOCUMENTATION.md) | Full endpoint reference |
+| [`docs/TESTING.md`](docs/TESTING.md) | 92 test cases with expected and actual results |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Deployment guide, verification checklist, troubleshooting |
+| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | Timed walkthrough for the final demonstration |
 | [`docs/VIVA_PREPARATION.md`](docs/VIVA_PREPARATION.md) | Design rationale and likely evaluation questions |
+| [`docs/FINAL_COMPLIANCE_CHECKLIST.md`](docs/FINAL_COMPLIANCE_CHECKLIST.md) | Audit of every requirement, including what is *not* done |
+| [`diagrams/use-case-diagram.md`](diagrams/use-case-diagram.md) | Use case diagram and implementation map |
 
-Documents are added as their milestone is reached; a link above may point to a file that does not exist yet.
+Review artefacts: [`docs/ServiceDesk_AI_Review1.pptx`](docs/ServiceDesk_AI_Review1.pptx) · [`docs/Report_Cover_Page.docx`](docs/Report_Cover_Page.docx)
 
 ---
 
