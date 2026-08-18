@@ -12,7 +12,7 @@ Built for **BCSE408L – Cloud Computing**, School of Computer Science Engineeri
 | **SaaS Category** | Customer Support SaaS |
 | **Problem Statement** | Manage customer complaints and automate ticket handling |
 | **Target Users** | Customer · Support Agent · Admin |
-| **Live URL** | _Not yet deployed — will be published at R2 (17 September)_ |
+| **Live URL** | _Not yet deployed — see [Project Status](#project-status)_ |
 
 ---
 
@@ -290,7 +290,14 @@ Deployment procedure, environment configuration, CORS setup, build and start com
 | [`docs/FINAL_COMPLIANCE_CHECKLIST.md`](docs/FINAL_COMPLIANCE_CHECKLIST.md) | Audit of every requirement, including what is *not* done |
 | [`diagrams/use-case-diagram.md`](diagrams/use-case-diagram.md) | Use case diagram and implementation map |
 
-Review artefacts: [`docs/ServiceDesk_AI_Review1.pptx`](docs/ServiceDesk_AI_Review1.pptx) · [`docs/Report_Cover_Page.docx`](docs/Report_Cover_Page.docx)
+### Review artefacts
+
+| Artefact | Contents |
+|---|---|
+| [`docs/ServiceDesk_AI_Final_Report.docx`](docs/ServiceDesk_AI_Final_Report.docx) | Final report — 73 pages, all 22 sections of the official template |
+| [`docs/ServiceDesk_AI_Final_Demo.pptx`](docs/ServiceDesk_AI_Final_Demo.pptx) | R3 demonstration deck — 12 slides with speaker notes |
+| [`docs/ServiceDesk_AI_Review1.pptx`](docs/ServiceDesk_AI_Review1.pptx) | R1 review deck — 18 slides with speaker notes |
+| [`docs/Report_Cover_Page.docx`](docs/Report_Cover_Page.docx) | Standalone cover page (also page 1 of the final report) |
 
 ---
 
