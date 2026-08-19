@@ -38,3 +38,6 @@ Thumbs.db
 .vercel
 .render
 .turbo
+
+# Local editor/agent tooling config
+.claude/
