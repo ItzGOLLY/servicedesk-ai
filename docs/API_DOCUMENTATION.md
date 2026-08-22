@@ -341,6 +341,86 @@ The CSV export quotes every field per RFC 4180 and prefixes values beginning wit
 
 ---
 
+## WhatsApp channel — `/api/whatsapp`
+
+WhatsApp is the primary intake channel: a customer raises and follows a ticket
+entirely from their phone, and agent replies are delivered back to that chat.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/whatsapp/webhook` | — (signed) | Inbound messages from the provider |
+| GET | `/whatsapp/webhook` | — | Provider verification challenge (Meta Cloud API) |
+| GET | `/whatsapp/admin/status` | AD | Active provider and channel statistics |
+| GET | `/whatsapp/admin/messages` | AD | Message log — `?direction=&page=&limit=` |
+| POST | `/whatsapp/admin/simulate` | AD | Inject an inbound message for testing |
+| POST | `/whatsapp/admin/test-send` | AD | Verify outbound delivery |
+
+### POST /whatsapp/webhook
+
+Public, because the provider calls it rather than a signed-in user. It is
+protected by **signature verification** instead of authentication — Twilio signs
+the request URL plus its sorted parameters, and an unsigned request is rejected
+with `403`. Without this the endpoint would let anyone raise tickets
+impersonating any phone number.
+
+**Always returns `200`**, even when processing fails. Providers retry any
+non-2xx response, and a message that cannot be processed will fail identically
+on every retry, so returning an error would produce an unbounded retry loop
+rather than fixing anything. Failures are recorded server-side.
+
+**Idempotency.** The provider's message id is inserted under a unique
+constraint before any work happens, so a replayed webhook is detected and
+dropped. Providers retry aggressively; without this a single customer message
+could raise several tickets.
+
+### Customer conversation model
+
+| Customer sends | System does |
+|---|---|
+| Any description of a problem, with no open ticket | Raises a ticket, classifies it, replies with the reference |
+| A further message while a ticket is open | Appends it to that ticket rather than creating a second |
+| `STATUS` | Lists their open requests |
+| `HELP` or `MENU` | Shows the command list |
+| `CLOSE` | Closes their most recent resolved ticket |
+| A message under 12 characters, with no open ticket | Asks for more detail instead of raising a thin ticket |
+
+An inbound message from an unrecognised number creates a Customer account keyed
+on that number. The account has no usable password — a random value is hashed
+and discarded — so it cannot be signed into until the person sets one through
+the normal flow.
+
+### Outbound formatting
+
+**WhatsApp renders no Markdown.** A heading written as `## Status` arrives as
+literal text. Every outbound message is therefore composed by a dedicated
+formatter that emits WhatsApp's own conventions (`*bold*`, `_italic_`) and
+converts anything an agent typed:
+
+| Agent writes | Customer receives |
+|---|---|
+| `**refund issued**` | `*refund issued*` |
+| `## Update` | `*Update*` |
+| `` `settings > billing` `` | `settings > billing` |
+| `- item` / `* item` | `- item` |
+| `[help](https://x.com)` | `help (https://x.com)` |
+
+Messages are truncated to 4096 characters on a word boundary, because the
+provider rejects anything longer outright.
+
+### GET /whatsapp/admin/status
+
+```json
+{ "success": true, "data": { "configuredProvider": "simulator", "activeProvider": "simulator", "simulated": true, "fromNumber": null, "inboundMessages": 3, "outboundMessages": 4, "failedMessages": 0, "ticketsFromWhatsApp": 2 } }
+```
+
+`simulated: true` means messages are recorded but not delivered to a real
+phone. The admin console states this plainly rather than implying delivery.
+
+Customer numbers are **masked** in the message log (`••••6554`); the console
+does not need full numbers to be useful.
+
+---
+
 ## Audit log — `/api/audit-logs`
 
 | Method | Path | Role | Description |

@@ -23,19 +23,21 @@ Tests run single-threaded because they share one database — parallel files wou
 | Date | 17 August 2026 |
 | Environment | Node.js 20, PostgreSQL 16 (local), `AI_PROVIDER=fallback` |
 | Command | `npm test` |
-| Test files | 4 passed (4) |
-| **Tests** | **92 passed (92), 0 failed** |
+| Test files | 5 passed (5) |
+| **Tests** | **123 passed (123), 0 failed** |
 | Duration | ~108 s |
 
 ```
- Test Files  4 passed (4)
-      Tests  92 passed (92)
+ Test Files  5 passed (5)
+      Tests  123 passed (123)
 ```
 
-Two defects were found and fixed by this suite during development:
+Four defects were found and fixed by this suite during development:
 
 1. **Rate limiter throttled the suite.** The 20-per-15-minute login limit is correct for production but caused 51 failures in a run that logs in far more often than a human. Fixed by skipping both limiters when `NODE_ENV=test`.
 2. **A test asserted an exact suggestion count.** The create route classifies in the background, so the count depended on timing. The assertion was rewritten to check that *every* stored suggestion is a correctly flagged classification, which is the property that actually matters.
+3. **The WhatsApp truncation could exceed the provider limit.** `truncate` reserved fewer characters than its own suffix needed, producing a 4097-character message where the maximum is 4096. WhatsApp rejects an over-length message outright, so this would have silently dropped long agent replies. The suffix length is now subtracted from the budget rather than assumed.
+4. **The WhatsApp test file closed the shared connection pool twice**, breaking a later suite. The teardown was hoisted to a single file-level hook.
 
 ---
 

@@ -36,6 +36,8 @@ The document describes what the system does, who uses it, and the constraints it
 | RBAC | Role-Based Access Control |
 | Internal note | A message on a ticket visible to staff only |
 | Fallback classifier | The deterministic rule-based engine used when the AI provider is unavailable |
+| Channel | Where a ticket or message entered the system: WhatsApp or the web application |
+| Simulator | The built-in WhatsApp provider that records messages without delivering them |
 | SaaS | Software as a Service — software delivered over the internet as a multi-user, centrally hosted service |
 
 ### 1.4 References
@@ -55,7 +57,7 @@ A small business receiving customer complaints across email, messaging apps and 
 
 Requirement analysis identified four concrete failures behind that one-line statement:
 
-1. **No single intake point.** Requests arrive in several channels and are never consolidated.
+1. **No single intake point.** Requests arrive in several channels — overwhelmingly WhatsApp for a small Indian business — and are never consolidated.
 2. **No ownership.** Without an assigned owner, a complaint is answered twice by different people or not at all.
 3. **No status or history.** The customer cannot check progress, so they follow up repeatedly, generating more work.
 4. **No measurement.** The business cannot say how many issues arrived, in what categories, or how long they took.
@@ -99,7 +101,7 @@ ServiceDesk AI is a multi-user, cloud-hosted SaaS application. Every complaint b
 
 **Workflow**
 
-1. A customer raises a ticket with a subject, description and optional category.
+1. A customer raises a ticket by **sending a WhatsApp message**, or through the web application.
 2. The system classifies it — proposing category, priority and sentiment, and generating a one-line summary.
 3. The ticket enters the agent queue, where it can be assigned, prioritised, filtered and searched.
 4. An agent resolves it, optionally starting from an AI-generated draft reply that they review and edit.
@@ -132,6 +134,7 @@ The five objectives below are quoted from the official Project 19 specification,
 
 ### 6.1 In scope
 
+- **WhatsApp as the primary intake channel**: two-way conversation, keyword commands and plain-text replies
 - Registration, login and profile management for three roles
 - Role-based access control enforced in the REST API
 - Full ticket lifecycle: create, read, update, delete, assign and status transitions
@@ -149,7 +152,7 @@ The five objectives below are quoted from the official Project 19 specification,
 Deliberately excluded to keep the delivered system complete and reliable rather than broad and unfinished:
 
 - Payment or subscription billing
-- Live chat and telephony integration
+- Live chat and telephony integration (WhatsApp is in scope; voice is not)
 - Native mobile applications
 - Multi-language support
 - Third-party CRM integrations
@@ -244,6 +247,24 @@ The ten requirements below are the official Project 19 functional requirements. 
 - FR-10.5 An Admin can manage ticket categories.
 - FR-10.6 An Admin can view an activity audit log of every privileged action.
 
+### FR-11 — WhatsApp channel
+
+WhatsApp is the primary way customers reach the service desk. It is a full
+requirement rather than an integration convenience, because it is the channel a
+small business's customers already use.
+
+- FR-11.1 A customer can raise a ticket by sending a WhatsApp message; no account or sign-in is required beforehand.
+- FR-11.2 An inbound message from an unrecognised number creates a Customer account keyed on that number, with no usable password until the person sets one.
+- FR-11.3 A further message while a ticket is open is appended to that ticket rather than creating a second one.
+- FR-11.4 The keywords `STATUS`, `HELP`, `MENU`, `NEW` and `CLOSE` are recognised.
+- FR-11.5 An agent replying in the web application has that reply delivered to the customer's WhatsApp chat.
+- FR-11.6 Status changes are notified to the customer on WhatsApp.
+- FR-11.7 **Every outbound message is plain text.** WhatsApp renders no Markdown, so agent formatting is converted to WhatsApp's own conventions before sending, and messages are truncated to the provider limit on a word boundary.
+- FR-11.8 Inbound webhooks are idempotent: a replayed delivery is detected by the provider message id and does not raise a duplicate ticket.
+- FR-11.9 The webhook verifies the provider's signature; an unsigned request is rejected.
+- FR-11.10 An administrator can see channel status, a message log with masked customer numbers, and can inject a test message.
+- FR-11.11 The channel operates with a built-in simulator when no provider credentials are configured, so it is demonstrable without an external account.
+
 ### 8.11 Ticket lifecycle
 
 ```
@@ -316,6 +337,7 @@ The six quality attributes required by the specification.
 - Lifecycle transitions validated server-side from a single transition table.
 - Related writes wrapped in transactions.
 - Every privileged action recorded in an audit log; every ticket change recorded on its timeline.
+- Inbound WhatsApp deliveries are idempotent, so provider retries cannot duplicate tickets.
 
 ### NFR-6 — Usability
 - One consistent design system across every screen.
@@ -434,7 +456,7 @@ The use case diagram is in [`../diagrams/use-case-diagram.md`](../diagrams/use-c
 | # | Enhancement | Rationale |
 |---|---|---|
 | E-1 | Email notifications in addition to in-app | Customers do not have to be signed in to learn of an update |
-| E-2 | File attachments on tickets via cloud object storage | Screenshots make technical issues far quicker to diagnose |
+| E-2 | File attachments, including WhatsApp images | Customers naturally photograph a problem; screenshots make issues far quicker to diagnose |
 | E-3 | Configurable SLA targets with automatic escalation | Lets the business enforce its own response commitments |
 | E-4 | Knowledge base with AI-suggested articles | Deflects repeat questions before they become tickets |
 | E-5 | Real-time updates over WebSockets | Removes the polling currently used for the notification badge |

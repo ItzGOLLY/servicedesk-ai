@@ -39,7 +39,7 @@ The table below reflects what is **actually built and verified**, not what is pl
 
 - Backend typecheck passes; frontend builds under strict TypeScript
 - Migrations apply cleanly to a real PostgreSQL instance
-- **92 automated tests pass (92/92)** against a real database — see [`docs/TESTING.md`](docs/TESTING.md)
+- **123 automated tests pass (123/123)** against a real database — see [`docs/TESTING.md`](docs/TESTING.md)
 - All three roles exercised end to end in a browser: registration, ticket creation with live AI classification, the agent AI draft-and-edit flow, admin dashboards, and the 375 px mobile layout
 
 **Not yet done:** the application is **not deployed**. No hosting account has been provisioned, so there is no live URL. [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) documents every step; [`docs/FINAL_COMPLIANCE_CHECKLIST.md`](docs/FINAL_COMPLIANCE_CHECKLIST.md) records exactly what is and is not complete.
@@ -61,6 +61,15 @@ The AI layer exists because small teams do not have a triage person. When a tick
 ---
 
 ## Features
+
+### WhatsApp channel — the primary way customers reach support
+- Raise a ticket by **sending a WhatsApp message** — no sign-up, no app, no portal
+- Follow-up messages are added to the same ticket, not a new one
+- Keywords: `STATUS`, `HELP`, `NEW`, `CLOSE`
+- Agent replies from the web app are delivered back to the customer's chat
+- **Every outbound message is plain text** — WhatsApp renders no Markdown, so agent formatting is converted before sending
+- Works with a built-in **simulator** requiring no external account, or Twilio for real delivery
+- Webhooks are signature-verified and idempotent, so provider retries cannot duplicate tickets
 
 ### Customer
 - Register, log in, and manage a profile
@@ -254,7 +263,7 @@ Responses follow one shape: `{ success, data, meta }` on success and `{ success:
 cd backend && npm test
 ```
 
-**92 tests, all passing**, run against a real PostgreSQL database using the same migration files as production — not mocks.
+**123 tests, all passing**, run against a real PostgreSQL database using the same migration files as production — not mocks.
 
 | Suite | Tests | Covers |
 |---|---|---|
@@ -262,6 +271,7 @@ cd backend && npm test
 | `authorization.test.ts` | 26 | Every role boundary, called directly against the API with the wrong role |
 | `tickets.test.ts` | 33 | CRUD, assignment, lifecycle transitions, messages, search and pagination |
 | `ai.test.ts` | 20 | Lifecycle rules, fallback classifier, and AI failure handling |
+| `whatsapp.test.ts` | 31 | Plain-text formatting, inbound flow, two-way delivery, idempotency |
 
 Two results worth noting: **ticket creation still succeeds when AI classification throws**, and **generating an AI draft creates zero customer-visible messages**. Full case-by-case results in [`docs/TESTING.md`](docs/TESTING.md).
 

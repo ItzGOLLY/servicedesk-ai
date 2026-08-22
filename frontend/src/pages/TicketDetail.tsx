@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Card, ErrorNotice, LoadingBlock, Spinner } from '../components/ui';
-import { PriorityBadge, SentimentBadge, StatusBadge } from '../components/TicketBits';
+import { ChannelBadge, PriorityBadge, SentimentBadge, StatusBadge } from '../components/TicketBits';
 import AiPanel from '../components/AiPanel';
 import { PRIORITY_OPTIONS, formatDateTime, humanise, initials, timeAgo } from '../lib/format';
 import type { Category, Ticket, TicketEvent, TicketMessage, User } from '../lib/types';
@@ -165,6 +165,7 @@ export default function TicketDetail() {
           <h1 className="mt-1 text-2xl font-bold text-ink">{ticket.subject}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ChannelBadge channel={ticket.channel} />
           <SentimentBadge sentiment={ticket.sentiment} />
           <PriorityBadge priority={ticket.priority} />
           <StatusBadge status={ticket.status} />
@@ -220,6 +221,7 @@ export default function TicketDetail() {
                   </div>
                 </div>
                 <div className="flex gap-1.5">
+                  <ChannelBadge channel={message.channel} />
                   {message.isInternalNote && (
                     <span className="badge bg-amber-200 text-amber-900">Internal note</span>
                   )}
@@ -252,6 +254,13 @@ export default function TicketDetail() {
                     : 'Type your message to the customer…'
                 }
               />
+
+              {ticket.channel === 'WHATSAPP' && !isInternalNote && (
+                <p className="mt-2 text-xs font-medium text-[#0B7A3E]">
+                  This customer is on WhatsApp. Your reply is delivered to their chat as plain
+                  text — formatting and links are converted automatically.
+                </p>
+              )}
 
               {aiAssisted && !isInternalNote && (
                 <p className="mt-2 text-xs font-medium text-brand-700">

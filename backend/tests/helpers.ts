@@ -26,8 +26,8 @@ export async function migrateTestDatabase(): Promise<void> {
 export async function resetDatabase(): Promise<void> {
   await pool.query(`
     TRUNCATE TABLE
-      ai_suggestions, ticket_events, ticket_messages, notifications,
-      audit_logs, tickets, categories, users
+      whatsapp_messages, ai_suggestions, ticket_events, ticket_messages,
+      notifications, audit_logs, tickets, categories, users
     RESTART IDENTITY CASCADE
   `);
   await pool.query('ALTER SEQUENCE ticket_reference_seq RESTART WITH 1000');

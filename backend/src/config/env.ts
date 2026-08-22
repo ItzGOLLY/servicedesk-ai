@@ -42,6 +42,17 @@ export const env = {
   aiModel: optional('AI_MODEL', 'claude-sonnet-5'),
   aiTimeoutMs: Number(optional('AI_TIMEOUT_MS', '12000')),
 
+  // WhatsApp channel.
+  // 'simulator' records messages without sending them, so the feature works
+  // with no external account; 'twilio' sends real messages.
+  whatsappProvider: optional('WHATSAPP_PROVIDER', 'simulator'),
+  whatsappAccountSid: process.env.WHATSAPP_ACCOUNT_SID ?? '',
+  whatsappAuthToken: process.env.WHATSAPP_AUTH_TOKEN ?? '',
+  whatsappFromNumber: process.env.WHATSAPP_FROM_NUMBER ?? '',
+  // The exact public URL the provider posts to; it is part of the signature.
+  whatsappWebhookUrl: process.env.WHATSAPP_WEBHOOK_URL ?? '',
+  whatsappTimeoutMs: Number(optional('WHATSAPP_TIMEOUT_MS', '10000')),
+
   seedAdminEmail: optional('SEED_ADMIN_EMAIL', 'admin@servicedesk.ai'),
   seedAdminPassword: optional('SEED_ADMIN_PASSWORD', 'Admin@12345'),
 };
