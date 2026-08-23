@@ -3,7 +3,15 @@ import { query, queryOne } from '../../db/pool';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { asyncHandler, ok } from '../../utils/http';
-import { aiStatus, draftReply, resolutionSteps, summariseTicket } from '../../services/ai';
+import {
+  aiStatus,
+  answerFromKnowledge,
+  draftReply,
+  resolutionSteps,
+  summariseTicket,
+} from '../../services/ai';
+import { recordRetrieval, retrieve } from '../knowledge/knowledge.service';
+import { embeddingStatus } from '../../services/embeddings';
 import { getTicketForUser } from '../tickets/tickets.service';
 import type { ConversationContext } from '../../services/ai';
 
@@ -120,6 +128,67 @@ aiRouter.post(
   })
 );
 
+/**
+ * POST /api/ai/tickets/:id/grounded-answer
+ *
+ * The RAG endpoint: retrieve relevant knowledge-base passages, then answer
+ * strictly from them. Distinct from /draft-reply, which is free generation —
+ * this one is constrained to documented material and returns citations, so the
+ * agent can verify the answer against its source before sending.
+ */
+aiRouter.post(
+  '/tickets/:id/grounded-answer',
+  requireRole('AGENT', 'ADMIN'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const context = await buildContext(req.params.id, req);
+
+    // The whole ticket is the query: subject alone is often too terse to
+    // retrieve well, and the description carries the specific symptoms.
+    const queryText = `${context.subject}\n\n${context.description}`;
+    const retrieval = await retrieve(queryText, 4);
+    await recordRetrieval(req.params.id, queryText, retrieval);
+
+    const outcome = await answerFromKnowledge(
+      context,
+      retrieval.chunks.map((c) => ({ id: c.chunkId, title: c.articleTitle, content: c.content }))
+    );
+
+    await storeSuggestion(
+      req.params.id,
+      'RESOLUTION_STEPS',
+      { ...outcome.result, retrieved: retrieval.chunks.length },
+      outcome.model,
+      outcome.usedFallback
+    );
+
+    // Only the passages the model actually cited are returned as sources, so
+    // the agent is never shown a citation the answer did not use.
+    const cited = new Set(outcome.result.citedIds);
+    ok(res, {
+      answer: outcome.result.answer,
+      insufficient: outcome.result.insufficient,
+      sources: retrieval.chunks
+        .filter((c) => cited.has(c.chunkId))
+        .map((c) => ({
+          chunkId: c.chunkId,
+          articleId: c.articleId,
+          title: c.articleTitle,
+          excerpt: c.content.slice(0, 240),
+          score: Number(c.score.toFixed(4)),
+        })),
+      retrieval: {
+        candidates: retrieval.chunks.length,
+        usedLexicalFallback: retrieval.usedLexicalFallback,
+        embeddingModel: retrieval.model,
+        semantic: embeddingStatus.semantic && !retrieval.usedLexicalFallback,
+      },
+      model: outcome.model,
+      usedFallback: outcome.usedFallback,
+      notice: 'Verify this against the cited sources before sending it to the customer.',
+    });
+  })
+);
+
 // GET /api/ai/tickets/:id/suggestions — what the AI has produced for this ticket
 aiRouter.get(
   '/tickets/:id/suggestions',
@@ -167,6 +236,7 @@ aiRouter.get(
     );
 
     ok(res, {
+      embeddings: embeddingStatus,
       configuredProvider: aiStatus.configured,
       activeModel: aiStatus.active,
       usingFallback: aiStatus.usingFallback,

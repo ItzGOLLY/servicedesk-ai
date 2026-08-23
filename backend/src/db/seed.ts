@@ -2,6 +2,9 @@ import { pool, closePool, query, queryOne } from './pool';
 import { env } from '../config/env';
 import { hashPassword } from '../utils/security';
 import { classifyAndStore } from '../modules/tickets/tickets.service';
+import { loggerFor } from '../observability/logger';
+
+const log = loggerFor('seed');
 
 /**
  * Creates demo data so the application is explorable immediately after deploy.
@@ -65,7 +68,7 @@ const TICKETS: [string, string, string][] = [
 ];
 
 async function seed(): Promise<void> {
-  console.log('[seed] starting');
+  log.info('starting');
 
   // --- categories ---
   for (const [name, description] of CATEGORIES) {
@@ -75,7 +78,7 @@ async function seed(): Promise<void> {
       [name, description]
     );
   }
-  console.log(`[seed] categories ready (${CATEGORIES.length})`);
+  log.info(`categories ready (${CATEGORIES.length})`);
 
   // --- admin ---
   const adminHash = await hashPassword(env.seedAdminPassword);
@@ -85,7 +88,7 @@ async function seed(): Promise<void> {
      ON CONFLICT (email) DO NOTHING`,
     [env.seedAdminEmail, adminHash]
   );
-  console.log(`[seed] admin ready (${env.seedAdminEmail})`);
+  log.info(`admin ready (${env.seedAdminEmail})`);
 
   // --- agents ---
   for (const [fullName, email, password, role] of STAFF) {
@@ -96,7 +99,7 @@ async function seed(): Promise<void> {
       [email, await hashPassword(password), fullName, role]
     );
   }
-  console.log(`[seed] agents ready (${STAFF.length})`);
+  log.info(`agents ready (${STAFF.length})`);
 
   // --- customers ---
   const customerHash = await hashPassword('Customer@12345');
@@ -108,13 +111,13 @@ async function seed(): Promise<void> {
       [email, customerHash, fullName]
     );
   }
-  console.log(`[seed] customers ready (${CUSTOMERS.length})`);
+  log.info(`customers ready (${CUSTOMERS.length})`);
 
   // --- tickets ---
   const existing = await queryOne<{ count: string }>('SELECT COUNT(*)::TEXT AS count FROM tickets');
   if (Number(existing?.count ?? 0) > 0) {
-    console.log('[seed] tickets already present — skipping');
-    console.log('[seed] done');
+    log.info('tickets already present — skipping');
+    log.info('done');
     return;
   }
 
@@ -137,14 +140,14 @@ async function seed(): Promise<void> {
       );
     }
   }
-  console.log(`[seed] tickets created (${createdIds.length})`);
+  log.info(`tickets created (${createdIds.length})`);
 
   // Classify sequentially so the console output stays readable and the AI
   // provider is not hit with six concurrent requests.
   for (const id of createdIds) {
     await classifyAndStore(id);
   }
-  console.log('[seed] tickets classified');
+  log.info('tickets classified');
 
   // Assign a couple so the agent dashboard is not empty on first login.
   const agent = await queryOne<{ id: string }>(
@@ -155,21 +158,23 @@ async function seed(): Promise<void> {
       `UPDATE tickets SET assigned_agent_id = $1, status = 'IN_PROGRESS' WHERE id = ANY($2::UUID[])`,
       [agent.id, createdIds.slice(0, 2)]
     );
-    console.log('[seed] sample tickets assigned');
+    log.info('sample tickets assigned');
   }
 
-  console.log('[seed] done');
-  console.log('');
-  console.log('  Admin     ', env.seedAdminEmail, '/', env.seedAdminPassword);
-  console.log('  Agent      priya.agent@servicedesk.ai / Agent@12345');
-  console.log('  Customer   rohan@example.com / Customer@12345');
-  console.log('');
+  log.info(
+    {
+      admin: env.seedAdminEmail,
+      agent: 'priya.agent@servicedesk.ai',
+      customer: 'rohan@example.com',
+    },
+    'seed complete - demo accounts created'
+  );
 }
 
 seed()
   .then(() => closePool())
   .catch(async (error) => {
-    console.error('[seed] failed:', error);
+    log.error('[seed] failed:', error);
     await closePool();
     process.exit(1);
   });

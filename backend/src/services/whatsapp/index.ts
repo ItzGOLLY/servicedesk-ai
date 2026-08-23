@@ -1,8 +1,12 @@
 import { env } from '../../config/env';
 import { query, queryOne } from '../../db/pool';
+import { notifyAdmins } from '../notifications';
 import { SimulatorWhatsAppProvider } from './simulator.provider';
 import { TwilioWhatsAppProvider } from './twilio.provider';
 import type { InboundMessage, WhatsAppProvider } from './types';
+import { loggerFor } from '../../observability/logger';
+
+const log = loggerFor('whatsapp');
 
 export * from './types';
 export * as templates from './format';
@@ -19,7 +23,7 @@ const simulator = new SimulatorWhatsAppProvider();
 function selectProvider(): WhatsAppProvider {
   if (env.whatsappProvider === 'twilio') {
     if (!env.whatsappAccountSid || !env.whatsappAuthToken || !env.whatsappFromNumber) {
-      console.warn('[whatsapp] provider=twilio but credentials are incomplete — using simulator.');
+      log.warn('[whatsapp] provider=twilio but credentials are incomplete — using simulator.');
       return simulator;
     }
     return new TwilioWhatsAppProvider();
@@ -103,7 +107,7 @@ export async function sendMessage(
     return { delivered: true };
   } catch (error) {
     const detail = (error as Error).message;
-    console.error('[whatsapp] send failed:', detail);
+    log.error({ err: detail, to: `****${number.slice(-4)}` }, 'WhatsApp send failed');
 
     // Recorded as FAILED so the failure is visible rather than silent.
     try {
@@ -122,8 +126,18 @@ export async function sendMessage(
         ]
       );
     } catch (logError) {
-      console.error('[whatsapp] could not record failure:', (logError as Error).message);
+      log.error({ err: (logError as Error).message }, 'could not record WhatsApp failure');
     }
+
+    // A permanently failed delivery is an operational problem a human must see:
+    // the customer is waiting on a reply that never arrived. Admins have a
+    // console for exactly this, so they are told rather than left to notice.
+    await notifyAdmins(
+      'TICKET_REPLY',
+      'WhatsApp delivery failed',
+      `A message to ••••${number.slice(-4)} could not be delivered. See the WhatsApp console.`,
+      options.ticketId ?? null
+    );
 
     return { delivered: false, error: detail };
   }

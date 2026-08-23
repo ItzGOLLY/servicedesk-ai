@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pool, closePool } from './pool';
+import { loggerFor } from '../observability/logger';
+
+const log = loggerFor('migrate');
 
 /**
  * Applies every .sql file in migrations/ in filename order, once each.
@@ -29,7 +32,7 @@ async function migrate(): Promise<void> {
 
   for (const file of files) {
     if (applied.has(file)) {
-      console.log(`[migrate] skip     ${file}`);
+      log.info({ file }, 'migration already applied');
       continue;
     }
     const sql = fs.readFileSync(path.join(dir, file), 'utf8');
@@ -39,7 +42,7 @@ async function migrate(): Promise<void> {
       await client.query(sql);
       await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
       await client.query('COMMIT');
-      console.log(`[migrate] applied  ${file}`);
+      log.info({ file }, 'migration applied');
     } catch (error) {
       await client.query('ROLLBACK');
       throw new Error(`Migration ${file} failed: ${(error as Error).message}`);
@@ -48,13 +51,13 @@ async function migrate(): Promise<void> {
     }
   }
 
-  console.log('[migrate] up to date');
+  log.info('schema up to date');
 }
 
 migrate()
   .then(() => closePool())
   .catch(async (error) => {
-    console.error('[migrate] failed:', error.message);
+    log.error({ err: error.message }, 'migration failed');
     await closePool();
     process.exit(1);
   });

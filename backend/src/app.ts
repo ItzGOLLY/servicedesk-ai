@@ -15,7 +15,11 @@ import { dashboardRouter } from './modules/reports/dashboard.routes';
 import { reportsRouter } from './modules/reports/reports.routes';
 import { aiRouter } from './modules/ai/ai.routes';
 import { whatsappRouter } from './modules/whatsapp/whatsapp.routes';
+import { knowledgeRouter } from './modules/knowledge/knowledge.routes';
 import { pool } from './db/pool';
+import { httpLogger } from './observability/httpLogger';
+import swaggerUi from 'swagger-ui-express';
+import { buildOpenApiDocument } from './openapi/spec';
 
 export function createApp(): Express {
   const app = express();
@@ -23,6 +27,10 @@ export function createApp(): Express {
   // Render and Vercel put the app behind a proxy; without this, req.ip is the
   // proxy's address and the rate limiter would treat all users as one client.
   app.set('trust proxy', 1);
+
+  // First in the chain so every request is logged, including ones later
+  // rejected by CORS or the rate limiter.
+  app.use(httpLogger);
 
   app.use(helmet());
 
@@ -85,6 +93,23 @@ export function createApp(): Express {
     }
   });
 
+  // Generated from the same Zod schemas that validate requests, so the
+  // documentation cannot drift from the implementation.
+  const openApiDocument = buildOpenApiDocument();
+
+  app.get('/api/openapi.json', (_req, res) => res.json(openApiDocument));
+  app.use(
+    '/api/docs',
+    // Helmet's default CSP blocks the inline styles Swagger UI needs, so it is
+    // relaxed for this route only rather than globally.
+    helmet({ contentSecurityPolicy: false }),
+    swaggerUi.serve,
+    swaggerUi.setup(openApiDocument, {
+      customSiteTitle: 'ServiceDesk AI — API',
+      swaggerOptions: { persistAuthorization: true },
+    })
+  );
+
   app.use('/api/auth', authRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/tickets', ticketsRouter);
@@ -93,6 +118,7 @@ export function createApp(): Express {
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/reports', reportsRouter);
   app.use('/api/ai', aiRouter);
+  app.use('/api/knowledge', knowledgeRouter);
   app.use('/api/whatsapp', whatsappRouter);
   app.use('/api/audit-logs', auditRouter);
 

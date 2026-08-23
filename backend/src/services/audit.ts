@@ -1,5 +1,8 @@
 import type { Request } from 'express';
 import { query } from '../db/pool';
+import { loggerFor } from '../observability/logger';
+
+const log = loggerFor('audit');
 
 /**
  * Records a privileged action.
@@ -21,6 +24,6 @@ export async function recordAudit(
       [req.user?.id ?? null, action, entityType, entityId, JSON.stringify(metadata), req.ip ?? null]
     );
   } catch (error) {
-    console.error('[audit] failed to record action:', (error as Error).message);
+    log.error({ err: (error as Error).message, action, entityType }, 'failed to record audit entry');
   }
 }
