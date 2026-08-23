@@ -35,6 +35,8 @@ backend/src/
 │   └── ai/                       Design decision, not a spec module
 ├── services/
 │   ├── ai/                       Provider adapter, Anthropic client, fallback
+│   ├── whatsapp/                 Provider adapter, Twilio client, simulator,
+│   │                             and the plain-text message formatter
 │   ├── audit.ts                  Audit logging
 │   └── notifications.ts          Notification creation
 ├── utils/
@@ -112,7 +114,30 @@ The fallback is not a stub — it is a working keyword classifier with category 
 
 The trade-off is a brief window where a new ticket is unclassified. That is acceptable — the UI shows the ticket immediately and the classification appears on the next load.
 
-### 3.6 Best-effort side effects
+### 3.6 WhatsApp uses the same adapter pattern as AI
+
+`WhatsAppProvider` has two implementations — a Twilio client and a simulator that
+records messages without sending them. The simulator is not a stub: the full
+inbound path runs against it, so the channel is developable, testable and
+demonstrable with no external account, no verified number and no network.
+
+Two properties are enforced in the service rather than left to callers.
+**Idempotency:** the provider's message id is inserted under a unique constraint
+before any work happens, because providers retry aggressively and a replayed
+webhook would otherwise raise a duplicate ticket. **Best-effort delivery:** a
+send failure is recorded with its error but never propagated, because a WhatsApp
+outage must not roll back the agent reply that triggered it — the reply is
+already saved and visible in the web application.
+
+### 3.7 Outbound text is composed in one place
+
+`services/whatsapp/format.ts` owns every customer-facing string. WhatsApp
+renders no Markdown, so an agent's `**bold**` would arrive as literal asterisks;
+the formatter converts it, along with headings, lists, inline code and links.
+Centralising this keeps the customer-facing voice consistent and means there is
+exactly one file to look at when changing what a customer reads.
+
+### 3.8 Best-effort side effects
 
 Audit logging and notification creation catch and log their own errors. A failure to write a notification must not roll back the status change that caused it: the user-visible operation succeeded, and reporting otherwise would be wrong.
 

@@ -11,6 +11,9 @@ export type TicketStatus =
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type TicketSentiment = 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
 
+/** Where a ticket or message entered the system. */
+export type TicketChannel = 'WEB' | 'WHATSAPP';
+
 export interface User {
   id: string;
   email: string;
@@ -32,6 +35,7 @@ export interface Ticket {
   aiSummary: string | null;
   aiConfidence: number | null;
   aiClassifiedAt: string | null;
+  channel: TicketChannel;
   createdAt: string;
   updatedAt: string;
   firstResponseAt: string | null;
@@ -47,6 +51,7 @@ export interface TicketMessage {
   body: string;
   isInternalNote: boolean;
   aiAssisted: boolean;
+  channel: TicketChannel;
   createdAt: string;
   author: { id: string; name: string | null; role: string };
 }
@@ -146,4 +151,26 @@ export interface CustomerDashboard {
     priority: TicketPriority;
     createdAt: string;
   }[];
+}
+
+export interface WhatsAppStatus {
+  configuredProvider: string;
+  activeProvider: string;
+  simulated: boolean;
+  fromNumber: string | null;
+  inboundMessages: number;
+  outboundMessages: number;
+  failedMessages: number;
+  ticketsFromWhatsApp: number;
+}
+
+export interface WhatsAppMessage {
+  id: string;
+  direction: 'INBOUND' | 'OUTBOUND';
+  number: string;
+  body: string;
+  status: string;
+  error: string | null;
+  ticketReference: string | null;
+  createdAt: string;
 }

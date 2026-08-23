@@ -7,7 +7,7 @@ import type { ListTicketsQuery } from './tickets.schemas';
 /** Columns every ticket response is built from, joined to human-readable names. */
 const TICKET_SELECT = `
   t.id, t.reference, t.subject, t.description, t.priority, t.status, t.sentiment,
-  t.ai_summary, t.ai_confidence, t.ai_classified_at,
+  t.ai_summary, t.ai_confidence, t.ai_classified_at, t.channel,
   t.created_at, t.updated_at, t.first_response_at, t.resolved_at, t.closed_at,
   t.customer_id, cu.full_name AS customer_name, cu.email AS customer_email,
   t.assigned_agent_id, ag.full_name AS agent_name,
@@ -32,6 +32,7 @@ export interface TicketRow {
   ai_summary: string | null;
   ai_confidence: string | null;
   ai_classified_at: Date | null;
+  channel: string;
   created_at: Date;
   updated_at: Date;
   first_response_at: Date | null;
@@ -58,6 +59,7 @@ export function toTicketDto(row: TicketRow) {
     aiSummary: row.ai_summary,
     aiConfidence: row.ai_confidence === null ? null : Number(row.ai_confidence),
     aiClassifiedAt: row.ai_classified_at,
+    channel: row.channel,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     firstResponseAt: row.first_response_at,

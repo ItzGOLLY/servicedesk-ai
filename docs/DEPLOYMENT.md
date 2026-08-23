@@ -140,6 +140,46 @@ A wildcard `*` will not work here: the app sends credentials, and browsers rejec
 
 ---
 
+## Step 4b — WhatsApp (optional)
+
+**The channel works without this step.** With `WHATSAPP_PROVIDER=simulator`
+(the default) messages are recorded and shown in the admin console but not
+delivered to a phone, so the whole flow is demonstrable with no external
+account. Do the following only if you want real delivery.
+
+1. Create a Twilio account and open the **WhatsApp Sandbox** (Messaging → Try it
+   out → Send a WhatsApp message). Join it by sending the given code from your
+   own phone — this takes minutes and needs no Meta business verification.
+2. On Render, set:
+
+| Variable | Value |
+|---|---|
+| `WHATSAPP_PROVIDER` | `twilio` |
+| `WHATSAPP_ACCOUNT_SID` | Your Twilio Account SID |
+| `WHATSAPP_AUTH_TOKEN` | Your Twilio Auth Token |
+| `WHATSAPP_FROM_NUMBER` | The sandbox number, e.g. `+14155238886` |
+| `WHATSAPP_WEBHOOK_URL` | `https://<your-api>.onrender.com/api/whatsapp/webhook` |
+
+3. In the Twilio sandbox settings, set **"When a message comes in"** to that same
+   webhook URL, method `POST`.
+
+`WHATSAPP_WEBHOOK_URL` must match what Twilio calls **character for character** —
+it is part of the request signature, and a mismatch makes every webhook fail
+verification with `403`.
+
+> The sandbox number expires after a period of inactivity and shows Twilio
+> branding. That is acceptable for a demonstration; production use requires a
+> verified WhatsApp Business number.
+
+**Verify:** send a WhatsApp message to the sandbox number. A ticket should
+appear in the queue within seconds, and you should receive a confirmation
+naming the reference.
+
+**If it does not work,** open the admin WhatsApp console — it states which
+provider is active, and the message log shows failed sends with their error.
+
+---
+
 ## Step 5 — Keep the free tier awake
 
 Render free instances sleep after ~15 minutes idle (first request then takes ~50 s), and Supabase pauses a project after ~7 days idle. One scheduled ping solves both.
@@ -190,6 +230,9 @@ Run through this after every deployment:
 | Deep link 404s on refresh | SPA rewrite missing | Confirm `frontend/vercel.json` is deployed |
 | `Missing required environment variable` at boot | A variable was not set | The error names the variable; add it and redeploy |
 | Charts show axes but no bars | Recharts animation under StrictMode | Already fixed via `isAnimationActive={false}`; ensure you deployed the current `main` |
+| WhatsApp webhook returns 403 | Signature mismatch | `WHATSAPP_WEBHOOK_URL` must exactly equal the URL configured at the provider |
+| Messages appear in the console but no phone receives them | Still on the simulator | Set `WHATSAPP_PROVIDER=twilio` with full credentials and redeploy |
+| WhatsApp messages create duplicate tickets | Would indicate the idempotency constraint is missing | Confirm `002_whatsapp.sql` was applied — `npm run migrate` |
 
 ---
 
