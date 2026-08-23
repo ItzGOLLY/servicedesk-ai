@@ -1,6 +1,6 @@
 # Database Design
 
-PostgreSQL 15+, hosted as a managed cloud service (Supabase). The schema is defined by `backend/src/db/migrations/001_init.sql`, which is the single source of truth — **this document and the ER diagram are derived from that file, so they cannot describe a database that does not exist.**
+PostgreSQL 15+, hosted as a managed cloud service (Supabase). The schema is defined by the migration files in `backend/src/db/migrations/` — `001_init.sql` and `002_whatsapp.sql` — which together are the single source of truth — **this document and the ER diagram are derived from that file, so they cannot describe a database that does not exist.**
 
 ---
 
@@ -27,6 +27,8 @@ erDiagram
     tickets ||--o{ ticket_events : "records"
     tickets ||--o{ ai_suggestions : "generates"
     tickets ||--o{ notifications : "references"
+    tickets ||--o{ whatsapp_messages : "conversation"
+    users ||--o{ whatsapp_messages : "sends and receives"
 
     users {
         uuid id PK
@@ -35,6 +37,7 @@ erDiagram
         text full_name
         user_role role
         text phone
+        text whatsapp_number UK
         boolean is_active
         timestamptz created_at
         timestamptz updated_at
@@ -59,6 +62,7 @@ erDiagram
         ticket_priority priority
         ticket_status status
         ticket_sentiment sentiment
+        ticket_channel channel
         text ai_summary
         numeric ai_confidence
         timestamptz ai_classified_at
@@ -76,6 +80,7 @@ erDiagram
         text body
         boolean is_internal_note
         boolean ai_assisted
+        ticket_channel channel
         timestamptz created_at
     }
 
@@ -111,6 +116,21 @@ erDiagram
         timestamptz created_at
     }
 
+    whatsapp_messages {
+        uuid id PK
+        wa_direction direction
+        text provider_message_id UK
+        text wa_number
+        text body
+        uuid ticket_id FK
+        uuid message_id FK
+        uuid user_id FK
+        wa_delivery_status status
+        text error_detail
+        text provider
+        timestamptz created_at
+    }
+
     audit_logs {
         uuid id PK
         uuid actor_id FK
@@ -136,6 +156,9 @@ Fixed vocabularies are modelled as PostgreSQL enums rather than lookup tables. T
 | `ticket_priority` | `LOW`, `MEDIUM`, `HIGH`, `URGENT` |
 | `ticket_sentiment` | `POSITIVE`, `NEUTRAL`, `NEGATIVE` |
 | `ai_suggestion_kind` | `CLASSIFICATION`, `DRAFT_REPLY`, `SUMMARY`, `RESOLUTION_STEPS` |
+| `ticket_channel` | `WEB`, `WHATSAPP` |
+| `wa_direction` | `INBOUND`, `OUTBOUND` |
+| `wa_delivery_status` | `PENDING`, `SENT`, `DELIVERED`, `READ`, `FAILED` |
 
 Enum declaration order matters: `ticket_priority` sorts `LOW < MEDIUM < HIGH < URGENT`, so `ORDER BY priority DESC` puts urgent tickets at the top of the agent queue without any additional column.
 

@@ -166,6 +166,7 @@ dashboardRouter.get(
       unassigned: string;
       customers: string;
       agents: string;
+      whatsapp_tickets: string;
     }>(
       `SELECT
          (SELECT COUNT(*)::TEXT FROM tickets) AS total,
@@ -173,7 +174,8 @@ dashboardRouter.get(
          (SELECT COUNT(*)::TEXT FROM tickets WHERE status IN ('RESOLVED','CLOSED')) AS resolved,
          (SELECT COUNT(*)::TEXT FROM tickets WHERE assigned_agent_id IS NULL AND status NOT IN ('RESOLVED','CLOSED')) AS unassigned,
          (SELECT COUNT(*)::TEXT FROM users WHERE role = 'CUSTOMER' AND is_active) AS customers,
-         (SELECT COUNT(*)::TEXT FROM users WHERE role IN ('AGENT','ADMIN') AND is_active) AS agents`
+         (SELECT COUNT(*)::TEXT FROM users WHERE role IN ('AGENT','ADMIN') AND is_active) AS agents,
+         (SELECT COUNT(*)::TEXT FROM tickets WHERE channel = 'WHATSAPP') AS whatsapp_tickets`
     );
 
     const resolution = await queryOne<{ avg_hours: string | null }>(
@@ -233,6 +235,7 @@ dashboardRouter.get(
         activeCustomers: num(counts?.customers),
         activeAgents: num(counts?.agents),
         averageResolutionHours: resolution?.avg_hours ? Number(resolution.avg_hours) : null,
+        whatsappTickets: num(counts?.whatsapp_tickets),
       },
       byStatus: shape(byStatus),
       byPriority: shape(byPriority),

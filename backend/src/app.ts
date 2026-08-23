@@ -14,6 +14,7 @@ import { notificationsRouter } from './modules/notifications/notifications.route
 import { dashboardRouter } from './modules/reports/dashboard.routes';
 import { reportsRouter } from './modules/reports/reports.routes';
 import { aiRouter } from './modules/ai/ai.routes';
+import { whatsappRouter } from './modules/whatsapp/whatsapp.routes';
 import { pool } from './db/pool';
 
 export function createApp(): Express {
@@ -43,7 +44,15 @@ export function createApp(): Express {
     })
   );
 
-  app.use(express.json({ limit: '1mb' }));
+  // The WhatsApp signature is computed over the raw body, so keep a copy
+  // before any parser rewrites it.
+  const captureRawBody = (req: express.Request, _res: express.Response, buf: Buffer) => {
+    (req as express.Request & { rawBody?: string }).rawBody = buf.toString('utf8');
+  };
+
+  app.use(express.json({ limit: '1mb', verify: captureRawBody }));
+  // Twilio posts form-encoded webhook bodies rather than JSON.
+  app.use(express.urlencoded({ extended: false, limit: '1mb', verify: captureRawBody }));
   app.use(cookieParser());
 
   // Broad safety net; the auth routes add a stricter limit of their own.
@@ -84,6 +93,7 @@ export function createApp(): Express {
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/reports', reportsRouter);
   app.use('/api/ai', aiRouter);
+  app.use('/api/whatsapp', whatsappRouter);
   app.use('/api/audit-logs', auditRouter);
 
   app.use(notFoundHandler);

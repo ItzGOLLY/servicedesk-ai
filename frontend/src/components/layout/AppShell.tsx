@@ -32,6 +32,7 @@ const NAV: NavItem[] = [
   { to: '/admin/tickets', label: 'Tickets', roles: ['ADMIN'], icon: icon('M4 6h16M4 12h16M4 18h16') },
   { to: '/admin/users', label: 'Users', roles: ['ADMIN'], icon: icon('M17 20h5v-2a3 3 0 00-5.4-1.8M9 20H4v-2a3 3 0 015.4-1.8M15 7a3 3 0 11-6 0 3 3 0 016 0z') },
   { to: '/admin/categories', label: 'Categories', roles: ['ADMIN'], icon: icon('M7 7h.01M7 3h5a2 2 0 011.4.6l7 7a2 2 0 010 2.8l-5 5a2 2 0 01-2.8 0l-7-7A2 2 0 013 10V5a2 2 0 012-2z') },
+  { to: '/admin/whatsapp', label: 'WhatsApp', roles: ['ADMIN'], icon: icon('M12 2a10 10 0 00-8.6 15.1L2 22l5-1.4A10 10 0 1012 2z') },
   { to: '/admin/reports', label: 'Reports', roles: ['ADMIN'], icon: icon('M9 17V9m4 8V5m4 12v-6M4 21h16a1 1 0 001-1V4a1 1 0 00-1-1H4a1 1 0 00-1 1v16a1 1 0 001 1z') },
   { to: '/admin/activity', label: 'Activity', roles: ['ADMIN'], icon: icon('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z') },
 

@@ -7,6 +7,7 @@ import { ApiError } from '../../utils/ApiError';
 import { asyncHandler, created, noContent, ok, paginationMeta } from '../../utils/http';
 import { recordAudit } from '../../services/audit';
 import { notify } from '../../services/notifications';
+import { notifyTicketCustomer, templates } from '../../services/whatsapp';
 import { canTransition, timestampsForStatus } from './lifecycle';
 import {
   assignTicketSchema,
@@ -66,7 +67,7 @@ ticketsRouter.post(
 
     const row = await queryOne<TicketRow>(
       `SELECT t.id, t.reference, t.subject, t.description, t.priority, t.status, t.sentiment,
-              t.ai_summary, t.ai_confidence, t.ai_classified_at, t.created_at, t.updated_at,
+              t.ai_summary, t.ai_confidence, t.ai_classified_at, t.channel, t.created_at, t.updated_at,
               t.first_response_at, t.resolved_at, t.closed_at,
               t.customer_id, cu.full_name AS customer_name, cu.email AS customer_email,
               t.assigned_agent_id, NULL::TEXT AS agent_name,
@@ -166,6 +167,22 @@ ticketsRouter.patch(
         `Ticket ${ticket.reference} is now ${status.replace(/_/g, ' ').toLowerCase()}`,
         `Your ticket "${ticket.subject}" moved from ${ticket.status} to ${status}.`,
         ticket.id
+      );
+
+      // Customers who reached us on WhatsApp are told there too, in plain text.
+      // Delivery is best-effort: it must not roll back the status change.
+      await notifyTicketCustomer(
+        ticket.id,
+        templates.statusChanged(
+          {
+            reference: ticket.reference,
+            subject: ticket.subject,
+            status,
+            priority: ticket.priority as never,
+            category: ticket.category_name,
+          },
+          status
+        )
       );
     }
 
@@ -303,12 +320,13 @@ ticketsRouter.get(
       body: string;
       is_internal_note: boolean;
       ai_assisted: boolean;
+      channel: string;
       created_at: Date;
       author_id: string;
       author_name: string;
       author_role: string;
     }>(
-      `SELECT m.id, m.body, m.is_internal_note, m.ai_assisted, m.created_at,
+      `SELECT m.id, m.body, m.is_internal_note, m.ai_assisted, m.channel::TEXT, m.created_at,
               m.author_id, u.full_name AS author_name, u.role AS author_role
          FROM ticket_messages m
          JOIN users u ON u.id = m.author_id
@@ -326,6 +344,7 @@ ticketsRouter.get(
         body: m.body,
         isInternalNote: m.is_internal_note,
         aiAssisted: m.ai_assisted,
+        channel: m.channel,
         createdAt: m.created_at,
         author: { id: m.author_id, name: m.author_name, role: m.author_role },
       }))
@@ -350,8 +369,8 @@ ticketsRouter.post(
     }
 
     const message = await queryOne<{ id: string; created_at: Date }>(
-      `INSERT INTO ticket_messages (ticket_id, author_id, body, is_internal_note, ai_assisted)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO ticket_messages (ticket_id, author_id, body, is_internal_note, ai_assisted, channel)
+       VALUES ($1, $2, $3, $4, $5, 'WEB')
        RETURNING id, created_at`,
       [ticket.id, req.user!.id, body, isInternalNote, aiAssisted]
     );
@@ -371,6 +390,30 @@ ticketsRouter.post(
         `New reply on ticket ${ticket.reference}`,
         'A support agent has replied to your request.',
         ticket.id
+      );
+
+      // The agent writes once, in the web application; if the customer came in
+      // over WhatsApp the same reply is delivered to their chat, converted from
+      // whatever formatting the agent used into WhatsApp's plain text.
+      const author = await queryOne<{ full_name: string }>(
+        'SELECT full_name FROM users WHERE id = $1',
+        [req.user!.id]
+      );
+
+      await notifyTicketCustomer(
+        ticket.id,
+        templates.agentReply(
+          {
+            reference: ticket.reference,
+            subject: ticket.subject,
+            status: ticket.status,
+            priority: ticket.priority as never,
+            category: ticket.category_name,
+          },
+          author?.full_name ?? 'Customer Support',
+          body
+        ),
+        message!.id
       );
     }
 
@@ -398,6 +441,7 @@ ticketsRouter.post(
       body,
       isInternalNote,
       aiAssisted,
+      channel: 'WEB',
       createdAt: message!.created_at,
       author: { id: req.user!.id, name: null, role: req.user!.role },
     });
