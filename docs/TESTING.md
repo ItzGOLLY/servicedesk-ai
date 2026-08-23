@@ -8,7 +8,9 @@ cp .env.example .env.test        # point DATABASE_URL at a dedicated test databa
 npm test
 ```
 
-The suite runs against a **real PostgreSQL database**, not a mock. It applies the same migration files the production database uses, so a schema constraint that would fail in production also fails here.
+The suite runs against a **real PostgreSQL database with pgvector**, not a mock.
+Start it with `docker compose up -d postgres` — the knowledge base needs the
+vector extension, so a plain `postgres:16` will fail migration 003. It applies the same migration files the production database uses, so a schema constraint that would fail in production also fails here.
 
 `AI_PROVIDER` is forced to `fallback` in `tests/setup.ts`, so tests never make a network call and results are deterministic.
 
@@ -23,14 +25,18 @@ Tests run single-threaded because they share one database — parallel files wou
 | Date | 17 August 2026 |
 | Environment | Node.js 20, PostgreSQL 16 (local), `AI_PROVIDER=fallback` |
 | Command | `npm test` |
-| Test files | 5 passed (5) |
-| **Tests** | **127 passed (127), 0 failed** |
+| Test files | 6 passed (6) |
+| **Tests** | **153 passed (153), 0 failed** |
 | Duration | ~108 s |
 
 ```
- Test Files  5 passed (5)
-      Tests  127 passed (127)
+ Test Files  6 passed (6)
+      Tests  153 passed (153)
 ```
+
+Also verified in **GitHub Actions CI** against the same `pgvector/pgvector:pg16`
+image used by Docker Compose, so CI cannot pass on a database that differs from
+local development.
 
 Four defects were found and fixed by this suite during development:
 

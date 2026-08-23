@@ -30,7 +30,7 @@ Audited 17 August 2026 against all three official BCSE408L documents.
 | Role-Based Access | ✅ | `middleware/rbac.ts` + ownership checks | 26 tests (R-01 – R-26) | 5, 6 | `CLOUD_ARCHITECTURE.md` §5 |
 | CRUD Operations | ✅ | `modules/tickets/`, users, categories | 22 tests (T-01 – T-22) | 3, 8, 10 | `API_DOCUMENTATION.md` |
 | Dashboard & Reports | ✅ | `modules/reports/` — 3 dashboards, 7 reports, CSV | Manual, browser-verified | 9, 10 | `API_DOCUMENTATION.md` |
-| Cloud Database | 🟡 | PostgreSQL schema + migrations, running locally | Whole suite on real PostgreSQL | 12 | `DATABASE_DESIGN.md` |
+| Cloud Database | 🟡 | PostgreSQL 16 + pgvector, running in Docker; cloud instance not provisioned | Whole suite on real PostgreSQL | 12 | `DATABASE_DESIGN.md` |
 | REST APIs | ✅ | ~40 endpoints, 9 groups | Whole suite via supertest | 13 | `API_DOCUMENTATION.md` |
 | Responsive UI | ✅ | Tailwind design system | Verified 375 / 768 / 1280 | 11 | `SYSTEM_ARCHITECTURE.md` §4 |
 | Live Cloud Deployment | ⬜ | Config written, not executed | — | 1 | `DEPLOYMENT.md` |
@@ -63,7 +63,7 @@ Audited 17 August 2026 against all three official BCSE408L documents.
 | Scalability | ✅ | Stateless API; bounded connection pool; server-side pagination; CDN frontend |
 | Availability | ✅ | Managed services; `/api/health` checks process + database; graceful SIGTERM shutdown; AI degrades rather than fails |
 | Performance | ✅ | Index on every filter column; GIN full-text index; pagination; client caching; AI off the critical path |
-| Reliability | ✅ | Database constraints; single lifecycle table; transactions; audit log; 92 passing tests |
+| Reliability | ✅ | Database constraints; single lifecycle table; transactions; audit log; 153 passing tests |
 | Usability | ✅ | One design system; responsive from 375 px; explicit loading/empty/error states; plain-language errors |
 
 ---
@@ -122,9 +122,9 @@ Not asserted from the code, but observed:
 |---|---|
 | `npm run typecheck` (backend) | Passes, zero errors |
 | `npm run build` (frontend, strict TS) | Passes, builds in 1.16 s |
-| `npm run migrate` against real PostgreSQL 16 | Applied `001_init.sql` cleanly |
+| `npm run migrate` against real PostgreSQL 16 | All 4 migrations applied cleanly |
 | `npm run seed` | 5 categories, 7 users, 6 tickets created and classified |
-| `npm test` | **92 passed (92)**, 4 files, ~108 s |
+| `npm test` | **153 passed (153)**, 6 files, ~161 s |
 | `GET /api/health` | `{"status":"ok","database":"connected"}` |
 | Customer registration and login in a browser | Works; dashboard shows live counts |
 | Ticket creation in a browser | `SD-1006` created; classified live as Technical / Urgent / Negative |
