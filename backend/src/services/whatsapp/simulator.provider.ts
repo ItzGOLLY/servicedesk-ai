@@ -1,3 +1,4 @@
+import { isProduction } from '../../config/env';
 import type { InboundMessage, OutboundMessage, SendResult, WhatsAppProvider } from './types';
 
 /**
@@ -19,8 +20,17 @@ export class SimulatorWhatsAppProvider implements WhatsAppProvider {
 
   async send(message: OutboundMessage): Promise<SendResult> {
     this.counter += 1;
-    // Logged so the outbound text is visible while developing.
-    console.log(`[whatsapp:simulator] → ${message.to}\n${message.body}\n`);
+
+    // The simulator is the default provider, so this runs in any deployment
+    // without credentials. Full numbers and message bodies are customer data
+    // and must not reach application logs: the number is masked and the body
+    // is omitted outside development. The admin console and the
+    // whatsapp_messages table are the intended way to inspect content.
+    if (!isProduction) {
+      console.log(
+        `[whatsapp:simulator] → ••••${message.to.slice(-4)} (${message.body.length} chars)`
+      );
+    }
     return {
       providerMessageId: `sim-${Date.now()}-${this.counter}`,
       status: 'SENT',

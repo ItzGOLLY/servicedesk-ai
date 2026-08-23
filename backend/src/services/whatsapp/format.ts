@@ -203,6 +203,33 @@ export function ticketClosed(ticket: TicketSummary): string {
   );
 }
 
+/**
+ * Shown when CLOSE cannot be applied.
+ *
+ * Previously this reused the status-change template, which read "is now open"
+ * and implied something had happened. The customer needs the reason instead.
+ */
+export function closeRefused(ticket: TicketSummary, reason: string): string {
+  return truncate(
+    `We could not close ${bold(ticket.reference)} yet.\n\n` +
+      `${toPlainText(reason)}\n\n` +
+      `It is currently ${bold(STATUS_TEXT[ticket.status])}. ` +
+      `Reply here if you would like to add anything, and an agent will pick it up.` +
+      SIGNATURE
+  );
+}
+
+/** Shown when NEW arrives with nothing after it. */
+export function describeForNew(): string {
+  return truncate(
+    `Sure — what is the new issue?\n\n` +
+      `Send ${bold('NEW')} followed by a short description, for example:\n` +
+      `${bold('NEW')} my replacement order has not arrived\n\n` +
+      `That raises a separate request rather than adding to your current one.` +
+      SIGNATURE
+  );
+}
+
 /** Shown when the message is too short to be a useful ticket. */
 export function tooShort(): string {
   return truncate(

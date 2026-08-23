@@ -256,7 +256,7 @@ small business's customers already use.
 - FR-11.1 A customer can raise a ticket by sending a WhatsApp message; no account or sign-in is required beforehand.
 - FR-11.2 An inbound message from an unrecognised number creates a Customer account keyed on that number, with no usable password until the person sets one.
 - FR-11.3 A further message while a ticket is open is appended to that ticket rather than creating a second one.
-- FR-11.4 The keywords `STATUS`, `HELP`, `MENU`, `NEW` and `CLOSE` are recognised.
+- FR-11.4 The keywords `STATUS`, `HELP`, `MENU`, `NEW` and `CLOSE` are recognised. `NEW <description>` raises a separate ticket even while another is open; `CLOSE` that cannot be applied returns the reason rather than a status message.
 - FR-11.5 An agent replying in the web application has that reply delivered to the customer's WhatsApp chat.
 - FR-11.6 Status changes are notified to the customer on WhatsApp.
 - FR-11.7 **Every outbound message is plain text.** WhatsApp renders no Markdown, so agent formatting is converted to WhatsApp's own conventions before sending, and messages are truncated to the provider limit on a word boundary.

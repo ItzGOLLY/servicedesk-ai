@@ -223,6 +223,16 @@ export default function WhatsAppConsole() {
 
           {messagesQuery.isLoading ? (
             <LoadingBlock />
+          ) : messagesQuery.isError ? (
+            // Without this branch a failed fetch rendered the empty state,
+            // telling the admin there are no messages when the log is simply
+            // unavailable.
+            <div className="p-4">
+              <ErrorNotice
+                message={(messagesQuery.error as Error).message}
+                onRetry={() => void messagesQuery.refetch()}
+              />
+            </div>
           ) : messages.length === 0 ? (
             <EmptyState
               title="No messages yet"

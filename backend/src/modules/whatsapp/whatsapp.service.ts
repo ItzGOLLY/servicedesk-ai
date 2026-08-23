@@ -98,11 +98,15 @@ function deriveSubject(body: string): string {
   return subject.length > 120 ? `${subject.slice(0, 117).trimEnd()}...` : subject;
 }
 
-async function createTicketFrom(
-  customerId: string,
-  customerName: string,
-  body: string
-): Promise<TicketRow> {
+/**
+ * Accounts created from a number carry a placeholder name ("WhatsApp 5678"),
+ * which must not be used as a greeting.
+ */
+function greetingName(fullName: string): string {
+  return fullName.startsWith('WhatsApp ') ? 'there' : fullName.split(' ')[0] || 'there';
+}
+
+async function createTicketFrom(customerId: string, body: string): Promise<TicketRow> {
   const ticket = await queryOne<TicketRow>(
     `INSERT INTO tickets (customer_id, subject, description, status, channel)
      VALUES ($1, $2, $3, 'NEW', 'WHATSAPP')
@@ -185,7 +189,8 @@ export async function handleInbound(
 
     const check = canTransition(latest.status, 'CLOSED', 'CUSTOMER');
     if (!check.allowed) {
-      await reply(templates.statusChanged(summaryOf(latest), latest.status));
+      // The reason matters here: "is now open" would imply something happened.
+      await reply(templates.closeRefused(summaryOf(latest), check.reason!), latest.id);
       return { handled: true, reason: `close refused: ${check.reason}` };
     }
 
@@ -195,13 +200,29 @@ export async function handleInbound(
     return { handled: true, reason: 'closed', ticketReference: latest.reference };
   }
 
-  const forceNew = keyword === 'NEW';
-  const content = forceNew ? '' : body;
+  // NEW raises a separate request even when one is already open. It is matched
+  // on the raw text rather than the collapsed keyword so a description can
+  // follow it: "NEW my replacement never arrived".
+  const newCommand = /^new\b\s*([\s\S]*)$/i.exec(body);
+  if (newCommand) {
+    const description = newCommand[1].trim();
 
-  if (forceNew) {
-    await reply(templates.helpText());
-    return { handled: true, reason: 'new requested' };
+    if (description.length < MIN_TICKET_LENGTH) {
+      await reply(templates.describeForNew());
+      return { handled: true, reason: 'new requested without a description' };
+    }
+
+    const ticket = await createTicketFrom(customer.id, description);
+    await query('UPDATE whatsapp_messages SET ticket_id = $1 WHERE id = $2', [
+      ticket.id,
+      recorded.id,
+    ]);
+    await reply(templates.ticketCreated(summaryOf(ticket), greetingName(customer.full_name)), ticket.id);
+
+    return { handled: true, reason: 'ticket created', ticketReference: ticket.reference };
   }
+
+  const content = body;
 
   // --- a message that is not a keyword -------------------------------------
 
@@ -255,17 +276,10 @@ export async function handleInbound(
     return { handled: true, reason: 'too short for a ticket' };
   }
 
-  const ticket = await createTicketFrom(customer.id, customer.full_name, content);
+  const ticket = await createTicketFrom(customer.id, content);
 
   await query('UPDATE whatsapp_messages SET ticket_id = $1 WHERE id = $2', [ticket.id, recorded.id]);
-
-  // Accounts created from a number carry a placeholder name ("WhatsApp 5678"),
-  // which must not be used as a greeting. A neutral form is used until the
-  // customer tells us their name.
-  const firstName = customer.full_name.startsWith('WhatsApp ')
-    ? 'there'
-    : customer.full_name.split(' ')[0] || 'there';
-  await reply(templates.ticketCreated(summaryOf(ticket), firstName), ticket.id);
+  await reply(templates.ticketCreated(summaryOf(ticket), greetingName(customer.full_name)), ticket.id);
 
   return { handled: true, reason: 'ticket created', ticketReference: ticket.reference };
 }

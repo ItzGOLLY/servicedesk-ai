@@ -381,7 +381,8 @@ could raise several tickets.
 | A further message while a ticket is open | Appends it to that ticket rather than creating a second |
 | `STATUS` | Lists their open requests |
 | `HELP` or `MENU` | Shows the command list |
-| `CLOSE` | Closes their most recent resolved ticket |
+| `NEW <description>` | Raises a separate ticket even while another is open; bare `NEW` asks for a description |
+| `CLOSE` | Closes their most recent resolved ticket, or explains why it cannot be closed yet |
 | A message under 12 characters, with no open ticket | Asks for more detail instead of raising a thin ticket |
 
 An inbound message from an unrecognised number creates a Customer account keyed

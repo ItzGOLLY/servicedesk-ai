@@ -243,6 +243,55 @@ describe('WhatsApp inbound flow (integration)', () => {
     expect(after?.status).toBe('CLOSED');
   });
 
+  it('raises a separate ticket for NEW with a description, even with one open', async () => {
+    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator');
+    const outcome = await handleInbound(
+      inbound('NEW my replacement order has still not arrived'),
+      'simulator'
+    );
+
+    expect(outcome.reason).toBe('ticket created');
+
+    const tickets = await query<{ subject: string }>('SELECT subject FROM tickets ORDER BY created_at');
+    expect(tickets).toHaveLength(2);
+    expect(tickets[1].subject).toContain('replacement order');
+  });
+
+  it('asks for a description when NEW arrives on its own', async () => {
+    const outcome = await handleInbound(inbound('NEW'), 'simulator');
+
+    expect(outcome.reason).toContain('without a description');
+    const tickets = await query('SELECT id FROM tickets');
+    expect(tickets).toHaveLength(0);
+
+    const sent = await query<{ body: string }>(
+      `SELECT body FROM whatsapp_messages WHERE direction = 'OUTBOUND' ORDER BY created_at DESC LIMIT 1`
+    );
+    expect(sent[0].body).toContain('what is the new issue');
+  });
+
+  it('does not treat a word merely starting with "new" as the NEW command', async () => {
+    const outcome = await handleInbound(
+      inbound('Newsletter signup is broken on your website checkout page.'),
+      'simulator'
+    );
+    expect(outcome.reason).toBe('ticket created');
+  });
+
+  it('explains why CLOSE was refused instead of implying a status change', async () => {
+    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator');
+
+    // The ticket is NEW, so a customer cannot close it.
+    const outcome = await handleInbound(inbound('CLOSE'), 'simulator');
+    expect(outcome.reason).toContain('close refused');
+
+    const sent = await query<{ body: string }>(
+      `SELECT body FROM whatsapp_messages WHERE direction = 'OUTBOUND' ORDER BY created_at DESC LIMIT 1`
+    );
+    expect(sent[0].body).toContain('could not close');
+    expect(sent[0].body).not.toContain('is now');
+  });
+
   it('rejects a sender number that is not a phone number', async () => {
     const outcome = await handleInbound(inbound('Hello there', 'not-a-number'), 'simulator');
     expect(outcome.handled).toBe(false);
