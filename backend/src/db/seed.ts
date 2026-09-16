@@ -174,7 +174,7 @@ async function seed(): Promise<void> {
 seed()
   .then(() => closePool())
   .catch(async (error) => {
-    log.error('[seed] failed:', error);
+    log.error({ err: error instanceof Error ? error.message : String(error) }, 'seed failed');
     await closePool();
     process.exit(1);
   });
