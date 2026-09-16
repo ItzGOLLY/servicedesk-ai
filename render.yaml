@@ -31,12 +31,15 @@ services:
     region: singapore
     rootDir: backend
 
-    buildCommand: npm ci && npm run build
-    # Migrations run on release rather than in the build, so the schema is
-    # current before new code serves traffic, and a failed migration blocks
-    # the release instead of leaving a half-migrated database live.
-    preDeployCommand: npm run migrate
-    startCommand: npm start
+    # --include=dev is required: NODE_ENV=production makes npm ci skip
+    # devDependencies, and both the compiler (tsc) and the migration runner
+    # (tsx) live there.
+    buildCommand: npm ci --include=dev && npm run build
+    # Migrations run before the server binds its port, so the schema is
+    # current before new code serves traffic and a failed migration stops the
+    # deploy. Render's separate preDeployCommand is not available on the free
+    # instance type, so the migration is chained into the start command.
+    startCommand: npm run migrate && npm start
 
     healthCheckPath: /api/health
 

@@ -605,7 +605,7 @@ What **is** ready:
 
 | Artefact | Purpose |
 |---|---|
-| `render.yaml` | Render Blueprint — provisions PostgreSQL 16 + API together, generates JWT secrets, runs `npm run migrate` as `preDeployCommand`, health check at `/api/health` |
+| `render.yaml` | Render Blueprint — provisions PostgreSQL 16 + API together, generates JWT secrets, runs `npm run migrate` before `npm start` (free tier has no `preDeployCommand`), health check at `/api/health` |
 | `frontend/vercel.json` | SPA rewrite so deep links resolve |
 | `docs/DEPLOYMENT.md` | Step-by-step with an 11-point verification checklist |
 | Docker images | Both build and run, proven locally |
