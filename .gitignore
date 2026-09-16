@@ -41,3 +41,6 @@ Thumbs.db
 
 # Local editor/agent tooling config
 .claude/
+
+# Local env backup
+.env.local.bak

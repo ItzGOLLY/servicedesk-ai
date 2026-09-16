@@ -1,5 +1,8 @@
 import { Pool, type QueryResultRow } from 'pg';
 import { env } from '../config/env';
+import { loggerFor } from '../observability/logger';
+
+const log = loggerFor('db');
 
 /**
  * A single shared connection pool.
@@ -18,7 +21,7 @@ export const pool = new Pool({
 
 pool.on('error', (err) => {
   // An idle client failing should not take the process down.
-  console.error('[db] idle client error:', err.message);
+  log.error({ err: err.message }, 'idle client error');
 });
 
 /** Runs a parameterized query. Values are never interpolated into SQL text. */

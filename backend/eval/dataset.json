@@ -1,0 +1,45 @@
+{
+  "description": "Hand-labelled support tickets for evaluating classification and retrieval. Labels are the category and priority a human triager would assign.",
+  "version": 1,
+  "tickets": [
+    {"id":"E01","subject":"Payment deducted but order still pending","body":"My payment of Rs 2499 was deducted from my card yesterday but the order still shows pending. No confirmation email either.","category":"Billing","priority":"URGENT","kbTopic":"refund"},
+    {"id":"E02","subject":"Charged twice for the same order","body":"I was charged twice for order 8821. Two identical amounts left my account within a minute of each other.","category":"Billing","priority":"HIGH","kbTopic":"refund"},
+    {"id":"E03","subject":"Refund not credited after two weeks","body":"I returned my item and pickup was completed but the refund has still not been credited after two weeks.","category":"Billing","priority":"HIGH","kbTopic":"refund"},
+    {"id":"E04","subject":"Invoice does not show GST number","body":"Could you please add my company GST number to future invoices? No rush at all.","category":"Billing","priority":"LOW","kbTopic":null},
+    {"id":"E05","subject":"Subscription renewed without warning","body":"My subscription auto renewed and I was billed without any reminder email beforehand.","category":"Billing","priority":"MEDIUM","kbTopic":"refund"},
+    {"id":"E06","subject":"Wrong amount charged at checkout","body":"The cart showed 1200 but my card was charged 1400. Where does the extra amount come from?","category":"Billing","priority":"HIGH","kbTopic":null},
+
+    {"id":"E07","subject":"App crashes every time I open checkout","body":"The application crashes immediately when I tap the checkout button. I reinstalled twice and nothing works.","category":"Technical","priority":"URGENT","kbTopic":"crash"},
+    {"id":"E08","subject":"Page keeps loading forever","body":"The orders page just shows a loading spinner and never finishes loading. It has been like this all morning.","category":"Technical","priority":"HIGH","kbTopic":"crash"},
+    {"id":"E09","subject":"Getting an error when uploading a photo","body":"Every time I try to attach a photo to my review I get an error message and it fails.","category":"Technical","priority":"MEDIUM","kbTopic":null},
+    {"id":"E10","subject":"App is very slow since the update","body":"Since the latest update the app has become extremely slow and freezes when I scroll.","category":"Technical","priority":"MEDIUM","kbTopic":"crash"},
+    {"id":"E11","subject":"Search returns a blank screen","body":"When I search for anything the results screen is completely blank. Nothing appears at all.","category":"Technical","priority":"HIGH","kbTopic":"crash"},
+    {"id":"E12","subject":"Suggestion for the mobile layout","body":"Just a suggestion, the buttons on the product page could be a bit larger on small phones.","category":"Technical","priority":"LOW","kbTopic":null},
+
+    {"id":"E13","subject":"Wrong item delivered","body":"I ordered a blue medium shirt but received a red large one. The invoice says blue medium.","category":"Delivery","priority":"HIGH","kbTopic":"returns"},
+    {"id":"E14","subject":"Package never arrived","body":"Tracking says my package was delivered but nothing arrived at my address. Nobody was home to receive it.","category":"Delivery","priority":"URGENT","kbTopic":"returns"},
+    {"id":"E15","subject":"Shipment delayed by a week","body":"My order was supposed to arrive last Tuesday and the courier tracking has not updated in six days.","category":"Delivery","priority":"HIGH","kbTopic":null},
+    {"id":"E16","subject":"Can I change my delivery address","body":"I placed an order this morning and I would like to change the delivery address if that is still possible.","category":"Delivery","priority":"MEDIUM","kbTopic":null},
+    {"id":"E17","subject":"Item arrived damaged","body":"The box was crushed and the item inside is broken. I would like a replacement sent.","category":"Delivery","priority":"HIGH","kbTopic":"returns"},
+    {"id":"E18","subject":"Question about shipping cost","body":"How is the shipping cost calculated for orders going outside the city? Just curious.","category":"Delivery","priority":"LOW","kbTopic":null},
+
+    {"id":"E19","subject":"Cannot reset my password","body":"I clicked forgot password several times but never receive the reset email. I checked spam already.","category":"Account","priority":"HIGH","kbTopic":null},
+    {"id":"E20","subject":"Account locked after failed logins","body":"My account is locked after I mistyped my password a few times. I cannot sign in at all now.","category":"Account","priority":"URGENT","kbTopic":null},
+    {"id":"E21","subject":"OTP not received on my phone","body":"The verification OTP never arrives on my registered mobile number so I cannot complete sign in.","category":"Account","priority":"HIGH","kbTopic":null},
+    {"id":"E22","subject":"Want to change my registered email","body":"I would like to update the email address on my profile to my new work address.","category":"Account","priority":"LOW","kbTopic":null},
+    {"id":"E23","subject":"Cannot log in after the update","body":"Since updating the app I cannot log in. It says my credentials are wrong but they are correct.","category":"Account","priority":"HIGH","kbTopic":null},
+    {"id":"E24","subject":"How do I delete my account","body":"I would like to know the process for deleting my account and the data associated with it.","category":"Account","priority":"LOW","kbTopic":null},
+
+    {"id":"E25","subject":"This is completely unacceptable service","body":"I have been waiting three weeks with no response. This is the worst service I have ever experienced and I am extremely frustrated.","category":"General","priority":"URGENT","kbTopic":null},
+    {"id":"E26","subject":"Thanks for the quick help","body":"Just wanted to say thank you, your agent resolved my issue very quickly and was excellent.","category":"General","priority":"LOW","kbTopic":null},
+    {"id":"E27","subject":"Do you have a physical store","body":"I was wondering whether you have a physical store in Chennai that I could visit.","category":"General","priority":"LOW","kbTopic":null},
+    {"id":"E28","subject":"Urgent help needed with my order","body":"I need urgent help, my order is for an event tomorrow and I have heard nothing from anyone.","category":"General","priority":"URGENT","kbTopic":null},
+    {"id":"E29","subject":"How long do I have to return an item","body":"What is the time limit for returning something I bought, and how do I start the return?","category":"Delivery","priority":"MEDIUM","kbTopic":"returns"},
+    {"id":"E30","subject":"Refund taking longer than promised","body":"I was told my refund would take five working days and it has now been well past that with no update.","category":"Billing","priority":"HIGH","kbTopic":"refund"}
+  ],
+  "kbArticles": [
+    {"topic":"refund","title":"Refund timelines and how to track a refund","body":"When a refund is approved it is sent to your bank the same working day.\n\nMost refunds appear within 5 to 7 working days. Card refunds can take up to 10 working days depending on the bank.\n\nIf a refund has not arrived after 10 working days, ask the customer for the refund reference number and raise a trace request with the payment gateway. Do not promise a specific date until the trace comes back.\n\nDuplicate charges are refunded automatically within 48 hours of detection."},
+    {"topic":"crash","title":"Fixing app crashes and freezing","body":"Crashes and freezing are usually caused by an outdated app version or a corrupt local cache.\n\nFirst ask the customer to update the app. Version 4.2 and above contains the stability fix for checkout, loading and search screens.\n\nIf the problem persists after updating, ask them to clear the app cache from device settings and sign in again.\n\nIf it still fails, collect the device model, OS version and app version and escalate to engineering with reproduction steps."},
+    {"topic":"returns","title":"Returns policy, pickup and damaged items","body":"Items can be returned within 30 days of delivery for any reason.\n\nTo start a return the customer opens the order in their account and selects Return. A courier pickup is scheduled within two working days.\n\nDamaged or wrong items are collected and replaced at no cost. Ask for a photograph of the item and the packaging before arranging collection.\n\nOnce the returned item reaches the warehouse it is inspected within two working days, after which the refund is approved."}
+  ]
+}

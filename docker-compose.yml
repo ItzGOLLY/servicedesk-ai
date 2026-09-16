@@ -1,0 +1,112 @@
+# ---------------------------------------------------------------------------
+# ServiceDesk AI — complete local stack
+#
+#   docker compose up --build
+#
+# Brings up PostgreSQL (with pgvector), applies migrations, seeds demo data,
+# starts the API and serves the frontend. No host dependencies beyond Docker.
+# ---------------------------------------------------------------------------
+
+services:
+  postgres:
+    # pgvector's own image rather than plain postgres:16, because the knowledge
+    # base stores embeddings and needs the vector extension available.
+    image: pgvector/pgvector:pg16
+    container_name: servicedesk-db
+    environment:
+      POSTGRES_USER: servicedesk
+      POSTGRES_PASSWORD: servicedesk_local_dev
+      POSTGRES_DB: servicedesk
+    ports:
+      # Exposed so host tooling (psql, the test suite) can reach it.
+      - '5433:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Init scripts run once on an empty volume: creates the test database
+      # and enables pgvector, so the suite works after any `down -v`.
+      - ./docker/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # The API waits on this, so it must report readiness to accept queries,
+      # not merely that the process started.
+      test: ['CMD-SHELL', 'pg_isready -U servicedesk -d servicedesk']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Runs migrations and seed once, then exits. Separating this from the API
+  # means the schema is applied exactly once regardless of how many API
+  # replicas start, and a migration failure is visible as its own failure.
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: servicedesk-migrate
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://servicedesk:servicedesk_local_dev@postgres:5432/servicedesk
+      DATABASE_SSL: 'false'
+      # Required by config validation at boot; not used by the migrate command.
+      JWT_ACCESS_SECRET: local-compose-access-secret-not-for-production
+      JWT_REFRESH_SECRET: local-compose-refresh-secret-not-for-production
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "node dist/db/migrate.js && node dist/db/seed.js"
+    restart: 'no'
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: servicedesk-api
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://servicedesk:servicedesk_local_dev@postgres:5432/servicedesk
+      DATABASE_SSL: 'false'
+      JWT_ACCESS_SECRET: local-compose-access-secret-not-for-production
+      JWT_REFRESH_SECRET: local-compose-refresh-secret-not-for-production
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_TTL: 7d
+      # The browser reaches the frontend on :8080, so that is the origin the
+      # API must allow. A mismatch here is the usual cause of CORS failures.
+      CORS_ORIGIN: http://localhost:8080
+      LOG_LEVEL: info
+      # Secrets are supplied from the host environment, never baked into the
+      # image. Absent values fall back to the offline providers.
+      AI_PROVIDER: ${AI_PROVIDER:-fallback}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-sonnet-5}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-deterministic}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-simulator}
+      WHATSAPP_ACCOUNT_SID: ${WHATSAPP_ACCOUNT_SID:-}
+      WHATSAPP_AUTH_TOKEN: ${WHATSAPP_AUTH_TOKEN:-}
+      WHATSAPP_FROM_NUMBER: ${WHATSAPP_FROM_NUMBER:-}
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked in at build time because Vite inlines VITE_* into the bundle.
+        VITE_API_BASE_URL: http://localhost:4000/api
+    container_name: servicedesk-web
+    ports:
+      - '8080:80'
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
