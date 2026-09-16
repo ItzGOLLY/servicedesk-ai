@@ -18,6 +18,10 @@ import { whatsappRouter } from './modules/whatsapp/whatsapp.routes';
 import { knowledgeRouter } from './modules/knowledge/knowledge.routes';
 import { pool } from './db/pool';
 import { httpLogger } from './observability/httpLogger';
+import { loggerFor } from './observability/logger';
+import { ApiError } from './utils/ApiError';
+
+const log = loggerFor('http');
 import swaggerUi from 'swagger-ui-express';
 import { buildOpenApiDocument } from './openapi/spec';
 
@@ -46,7 +50,8 @@ export function createApp(): Express {
           callback(null, true);
           return;
         }
-        callback(new Error(`Origin ${origin} is not allowed by CORS policy.`));
+        log.warn({ origin, allowed: env.corsOrigins }, 'origin rejected by CORS');
+        callback(ApiError.forbidden(`Origin ${origin} is not allowed by CORS policy.`));
       },
       credentials: true,
     })
