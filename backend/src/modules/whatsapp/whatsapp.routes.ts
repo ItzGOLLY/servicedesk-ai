@@ -16,7 +16,7 @@ import {
   normaliseNumber,
 } from '../../services/whatsapp';
 import { handleInbound } from './whatsapp.service';
-import { isTest } from '../../config/env';
+import { env, isTest } from '../../config/env';
 import { loggerFor } from '../../observability/logger';
 
 const log = loggerFor('whatsapp');
@@ -81,7 +81,7 @@ whatsappRouter.get('/webhook', (req: Request, res: Response) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode === 'subscribe' && token && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+  if (mode === 'subscribe' && token && env.whatsappVerifyToken && token === env.whatsappVerifyToken) {
     res.status(200).send(String(challenge ?? ''));
     return;
   }

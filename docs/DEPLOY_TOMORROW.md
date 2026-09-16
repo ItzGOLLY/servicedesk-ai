@@ -3,8 +3,8 @@
 Total time: **~60 minutes.** Do them in order; each step needs the one before it.
 Have your phone with WhatsApp ready.
 
-Everything below uses **free tiers**. No card is needed for Render, Vercel or the
-Twilio sandbox.
+Everything below uses **free tiers**. No card is needed for Render, Vercel or
+Meta's WhatsApp Cloud API.
 
 ---
 
@@ -121,51 +121,92 @@ Login will fail with a CORS error until you do this.
 
 ---
 
-## Step 4 — Real WhatsApp via Twilio sandbox  (~15 min)
+## Step 4 — Real WhatsApp via Meta's Cloud API  (~25 min, free)
 
-1. Go to **https://www.twilio.com/try-twilio** → sign up (free, no card).
-2. Console → **Messaging → Try it out → Send a WhatsApp message**.
-3. You will see a sandbox number (like `+1 415 523 8886`) and a join code
-   (like `join something-word`).
-4. **On your phone:** open WhatsApp, message that number with the join code.
-   You get a confirmation. Your phone is now allowed to talk to the sandbox.
-   *(Ask your teammate to do this too — then you can demo from two phones.)*
-5. Still on that Twilio page, open the **Sandbox settings** tab:
+Meta's test number sends real free-form replies inside the 24-hour window a
+customer's own message opens — which is always the case here, because the
+customer writes first. Up to 5 phones can be verified as recipients.
 
-| Field | Value |
+> **Why not Twilio?** A Twilio *trial* account refuses free-form WhatsApp text
+> on every sender, sandbox included (error 21654, "ContentSid Required"), and
+> lifting that needs a ~$20 top-up. The Twilio provider is still in the code
+> (`WHATSAPP_PROVIDER=twilio`) for an upgraded account.
+
+### 4a — Create the app
+
+1. **https://developers.facebook.com** → log in with a Facebook account →
+   **Get Started** and register as a developer if asked.
+2. **My Apps → Create App** → use case **Other** → type **Business** → name
+   `ServiceDesk AI` → Create. If it asks for a Business Portfolio, create one
+   with any name.
+3. On the app dashboard → **Add product → WhatsApp → Set up**. Meta creates a
+   test WhatsApp Business account with a test sender number.
+
+### 4b — Collect the five values
+
+| Value | Where |
 |---|---|
-| **When a message comes in** | `https://servicedesk-api-xxxx.onrender.com/api/whatsapp/webhook` |
-| Method | **POST** |
+| **Phone number ID** | WhatsApp → **API Setup** — under the test "From" number |
+| **Test number** (e.g. `+1 555 …`) | Same place — the "From" number |
+| **Access token** | Same page → **Generate** (temporary, **expires in 24 h** — see 4f) |
+| **App Secret** | **App settings → Basic → App Secret → Show** |
+| **Verify token** | You invent it, e.g. `servicedesk-verify-2026` |
 
-   Save.
-6. Get your credentials: Twilio Console home → **Account Info** box shows
-   **Account SID** and **Auth Token** (click to reveal).
-7. Render dashboard → `servicedesk-api` → **Environment** → set:
+Still on **API Setup**, under **To** → **Manage phone number list** → add your
+phone (+91…) → enter the OTP WhatsApp sends → verified. Add your teammate too.
+
+### 4c — Set Render **before** touching the webhook
+
+Render → `servicedesk-api` → **Environment**:
 
 | Variable | Value |
 |---|---|
-| `WHATSAPP_PROVIDER` | `twilio` |
-| `WHATSAPP_ACCOUNT_SID` | your Account SID |
-| `WHATSAPP_AUTH_TOKEN` | your Auth Token |
-| `WHATSAPP_FROM_NUMBER` | the sandbox number as `+14155238886` (digits only, with `+`) |
-| `WHATSAPP_WEBHOOK_URL` | `https://servicedesk-api-xxxx.onrender.com/api/whatsapp/webhook` |
+| `WHATSAPP_PROVIDER` | `meta` |
+| `WHATSAPP_ACCESS_TOKEN` | the token from 4b |
+| `WHATSAPP_PHONE_NUMBER_ID` | the Phone number ID |
+| `WHATSAPP_APP_SECRET` | the App Secret |
+| `WHATSAPP_VERIFY_TOKEN` | your invented string |
+| `WHATSAPP_FROM_NUMBER` | the test number as `+1555…` (display only) |
 
-   **`WHATSAPP_WEBHOOK_URL` must match step 5 character for character** — it is
-   part of the request signature. A mismatch = every message rejected with 403.
+Save → wait for **Live**. Meta's webhook check (4d) calls the API with the
+verify token, so the API must be running with it first.
 
-8. Save → Render redeploys.
+### 4d — Point Meta at the API
 
-**Test:** from your phone, WhatsApp the sandbox number:
+WhatsApp → **Configuration** → Webhook → **Edit**:
+
+| Field | Value |
+|---|---|
+| Callback URL | `https://servicedesk-api-ss2d.onrender.com/api/whatsapp/webhook` |
+| Verify token | exactly what you put in `WHATSAPP_VERIFY_TOKEN` |
+
+**Verify and save.** Then on the same page → Webhook fields → **Manage** →
+subscribe to **`messages`**. Nothing else.
+
+### 4e — Test
+
+From your verified phone, WhatsApp the **test number**:
 > my payment was deducted but the order is still pending
 
-Within ~5 s you should get back a reply naming a ticket `SD-nnnn`. Open the web
-app as `priya.agent@servicedesk.ai` → the ticket is in the queue.
+A reply naming `SD-nnnn` arrives within a few seconds. Send `STATUS`. Log in
+as `priya.agent@servicedesk.ai`, reply from the web app → it lands on the
+phone.
 
-Reply from the web app → it arrives on your phone.
+**If nothing comes back:** admin → **WhatsApp** in the sidebar shows every
+inbound message and the exact error on the outbound.
 
-**If nothing comes back:** open the web app as admin → **WhatsApp** in the
-sidebar. The console shows the active provider and every message with its
-error. Most common cause: `WHATSAPP_WEBHOOK_URL` doesn't exactly match.
+### 4f — The token expires in 24 hours
+
+The temporary token from API Setup dies a day after you generate it — likely
+**during your review** if you set up the night before. Two options:
+
+- **Simple:** on the morning of the review, API Setup → **Generate** again →
+  paste into `WHATSAPP_ACCESS_TOKEN` on Render → Save (2-minute redeploy).
+- **Permanent (recommended, ~5 min):** https://business.facebook.com/settings
+  → **Users → System users → Add** (name `servicedesk-api`, role Admin) →
+  **Add assets** → Apps → your app → Full control → **Generate token** →
+  select the app, expiry **Never**, permissions `whatsapp_business_messaging`
+  and `whatsapp_business_management` → copy it into `WHATSAPP_ACCESS_TOKEN`.
 
 ---
 
@@ -219,7 +260,8 @@ Commit and push. Only after it's actually live.
 | Page loads slowly / 502 | Free tier woke up — wait 50 s, refresh |
 | Login fails with a network error | CORS — step 3, check the origin has no trailing slash |
 | WhatsApp reply doesn't come | Admin → WhatsApp console → read the error |
-| Twilio says "not joined" | Re-send the join code from your phone |
+| Error mentions OAuth / token (code 190) | The 24 h token expired — step 4f |
+| Meta says recipient not allowed (code 131030) | Add that phone under API Setup → To → Manage phone number list |
 | Everything is on fire | `docker compose up -d` locally and demo from `localhost:8080` — say so openly |
 
 ---

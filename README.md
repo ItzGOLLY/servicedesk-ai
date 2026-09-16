@@ -72,7 +72,7 @@ The AI layer exists because small teams do not have a triage person. When a tick
 - Keywords: `STATUS`, `HELP`, `NEW <description>`, `CLOSE`
 - Agent replies from the web app are delivered back to the customer's chat
 - **Every outbound message is plain text** — WhatsApp renders no Markdown, so agent formatting is converted before sending
-- Works with a built-in **simulator** requiring no external account, or Twilio for real delivery
+- Works with a built-in **simulator** requiring no external account, or Meta's WhatsApp Cloud API / Twilio for real delivery
 - Webhooks are signature-verified and idempotent, so provider retries cannot duplicate tickets
 
 ### Customer
