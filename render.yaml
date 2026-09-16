@@ -104,3 +104,5 @@ services:
         sync: false
       - key: WHATSAPP_WEBHOOK_URL
         sync: false
+      - key: WHATSAPP_CONTENT_SID
+        sync: false

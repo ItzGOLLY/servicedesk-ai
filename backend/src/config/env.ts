@@ -70,6 +70,10 @@ export const env = {
   // The exact public URL the provider posts to; it is part of the signature.
   whatsappWebhookUrl: process.env.WHATSAPP_WEBHOOK_URL ?? '',
   whatsappTimeoutMs: Number(optional('WHATSAPP_TIMEOUT_MS', '10000')),
+  // Optional Content Template (HX...) for senders that only accept templates,
+  // and the template variable the reply text is placed in.
+  whatsappContentSid: process.env.WHATSAPP_CONTENT_SID ?? '',
+  whatsappContentVariable: optional('WHATSAPP_CONTENT_VARIABLE', '1'),
 
   // Embeddings for knowledge-base retrieval.
   // 'deterministic' computes lexical vectors locally with no network or key;
