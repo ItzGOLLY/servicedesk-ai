@@ -94,8 +94,10 @@ services:
       - key: EMBEDDING_MODEL
         value: text-embedding-3-small
 
+      # Set in the dashboard (simulator or twilio). Not pinned here, so a
+      # Blueprint sync never resets a live Twilio configuration to simulator.
       - key: WHATSAPP_PROVIDER
-        value: simulator
+        sync: false
       - key: WHATSAPP_ACCOUNT_SID
         sync: false
       - key: WHATSAPP_AUTH_TOKEN
