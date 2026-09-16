@@ -26,12 +26,12 @@ Tests run single-threaded because they share one database — parallel files wou
 | Environment | Node.js 20, PostgreSQL 16 (local), `AI_PROVIDER=fallback` |
 | Command | `npm test` |
 | Test files | 6 passed (6) |
-| **Tests** | **153 passed (153), 0 failed** |
+| **Tests** | **158 passed (158), 0 failed** |
 | Duration | ~108 s |
 
 ```
  Test Files  6 passed (6)
-      Tests  153 passed (153)
+      Tests  158 passed (158)
 ```
 
 Also verified in **GitHub Actions CI** against the same `pgvector/pgvector:pg16`

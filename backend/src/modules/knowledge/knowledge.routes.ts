@@ -113,9 +113,15 @@ knowledgeRouter.post(
   })
 );
 
+// A UUID-only matcher. Express's :id already matches one segment, so
+// /status/embeddings never collided with it — but making the intent explicit
+// costs nothing and turns a garbage id into a clean 404 instead of a
+// database-error-derived 400.
+const UUID = '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})';
+
 // GET /api/knowledge/:id
 knowledgeRouter.get(
-  '/:id',
+  `/:id${UUID}`,
   requireRole('AGENT', 'ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
     const article = await queryOne<ArticleRow>(
@@ -133,7 +139,7 @@ knowledgeRouter.get(
 
 // PATCH /api/knowledge/:id — editing re-indexes, or the index goes stale
 knowledgeRouter.patch(
-  '/:id',
+  `/:id${UUID}`,
   requireRole('ADMIN'),
   validate(articleSchema.partial()),
   asyncHandler(async (req: Request, res: Response) => {
@@ -171,7 +177,7 @@ knowledgeRouter.patch(
 
 // DELETE /api/knowledge/:id — chunks cascade
 knowledgeRouter.delete(
-  '/:id',
+  `/:id${UUID}`,
   requireRole('ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
     const article = await queryOne<{ id: string; title: string }>(
@@ -188,7 +194,7 @@ knowledgeRouter.delete(
 
 // POST /api/knowledge/:id/reindex — after an embedding provider change
 knowledgeRouter.post(
-  '/:id/reindex',
+  `/:id${UUID}/reindex`,
   requireRole('ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
     const exists = await queryOne('SELECT id FROM kb_articles WHERE id = $1', [req.params.id]);
@@ -218,8 +224,11 @@ knowledgeRouter.post(
     ok(res, {
       results: outcome.chunks,
       usedLexicalFallback: outcome.usedLexicalFallback,
+      embeddingUsedFallback: outcome.embeddingUsedFallback,
       embeddingModel: outcome.model,
-      semantic: embeddingStatus.semantic && !outcome.usedLexicalFallback,
+      // Semantic only if a semantic embedder actually ran AND vector search ran.
+      semantic:
+        embeddingStatus.semantic && !outcome.embeddingUsedFallback && !outcome.usedLexicalFallback,
     });
   })
 );

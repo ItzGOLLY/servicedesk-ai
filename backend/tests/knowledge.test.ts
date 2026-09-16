@@ -290,6 +290,51 @@ describe('Knowledge base and retrieval (integration)', () => {
     });
   });
 
+  it('reports vector search as NOT a lexical fallback, even on the offline embedder', async () => {
+    await createArticle();
+    const outcome = await retrieve('refund has not arrived', 3);
+
+    // Vector search ran (chunks are embedded), so this must be false. The bug
+    // being pinned here set it from the embedder's own fallback flag.
+    expect(outcome.usedLexicalFallback).toBe(false);
+    expect(outcome.embeddingUsedFallback).toBe(true);
+    expect(outcome.model).toBe('deterministic-lexical');
+  });
+
+  it('reports the lexical path honestly when nothing is embedded', async () => {
+    // Insert an article but strip its embeddings so only full-text can serve.
+    const created = await createArticle();
+    await query('UPDATE kb_chunks SET embedding = NULL WHERE article_id = $1', [created.body.data.id]);
+
+    const outcome = await retrieve('refund working days', 3);
+    expect(outcome.usedLexicalFallback).toBe(true);
+    expect(outcome.model).toBe('postgres-fts');
+  });
+
+  it('routes /status/embeddings to the status handler, not the :id handler', async () => {
+    const response = await request(app).get('/api/knowledge/status/embeddings').set(auth(admin));
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveProperty('dimensions');
+  });
+
+  it('returns 404 for a non-UUID article id', async () => {
+    const response = await request(app).get('/api/knowledge/not-a-uuid').set(auth(admin));
+    expect(response.status).toBe(404);
+  });
+
+  it('stores grounded answers under their own suggestion kind', async () => {
+    await createArticle();
+    const ticket = await createTicket(customer, 'Refund missing', 'My refund has not arrived at all.');
+    await request(app).post(`/api/ai/tickets/${ticket.id}/grounded-answer`).set(auth(agent));
+
+    const rows = await query<{ kind: string }>(
+      'SELECT kind::TEXT FROM ai_suggestions WHERE ticket_id = $1',
+      [ticket.id]
+    );
+    expect(rows.map((r) => r.kind)).toContain('GROUNDED_ANSWER');
+    expect(rows.map((r) => r.kind)).not.toContain('RESOLUTION_STEPS');
+  });
+
   it('reports embedding status to an admin', async () => {
     await createArticle();
     const response = await request(app).get('/api/knowledge/status/embeddings').set(auth(admin));

@@ -50,7 +50,7 @@ async function buildContext(ticketId: string, req: Request): Promise<Conversatio
 
 async function storeSuggestion(
   ticketId: string,
-  kind: 'DRAFT_REPLY' | 'SUMMARY' | 'RESOLUTION_STEPS',
+  kind: 'DRAFT_REPLY' | 'SUMMARY' | 'RESOLUTION_STEPS' | 'GROUNDED_ANSWER',
   content: unknown,
   model: string,
   usedFallback: boolean
@@ -155,7 +155,7 @@ aiRouter.post(
 
     await storeSuggestion(
       req.params.id,
-      'RESOLUTION_STEPS',
+      'GROUNDED_ANSWER',
       { ...outcome.result, retrieved: retrieval.chunks.length },
       outcome.model,
       outcome.usedFallback
@@ -179,8 +179,10 @@ aiRouter.post(
       retrieval: {
         candidates: retrieval.chunks.length,
         usedLexicalFallback: retrieval.usedLexicalFallback,
+        embeddingUsedFallback: retrieval.embeddingUsedFallback,
         embeddingModel: retrieval.model,
-        semantic: embeddingStatus.semantic && !retrieval.usedLexicalFallback,
+        semantic:
+          embeddingStatus.semantic && !retrieval.embeddingUsedFallback && !retrieval.usedLexicalFallback,
       },
       model: outcome.model,
       usedFallback: outcome.usedFallback,

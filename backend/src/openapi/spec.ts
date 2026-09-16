@@ -80,7 +80,8 @@ const groundedAnswerSchema = z
     ),
     retrieval: z.object({
       candidates: z.number(),
-      usedLexicalFallback: z.boolean(),
+      usedLexicalFallback: z.boolean().describe('True only when full-text search ran instead of vector search'),
+      embeddingUsedFallback: z.boolean().describe('True when the offline embedder produced the query vector'),
       embeddingModel: z.string(),
       semantic: z.boolean(),
     }),

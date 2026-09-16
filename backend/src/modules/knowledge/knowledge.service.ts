@@ -120,7 +120,10 @@ export interface RetrievedChunk {
 
 export interface RetrievalOutcome {
   chunks: RetrievedChunk[];
+  /** True only when PostgreSQL full-text search ran instead of vector search. */
   usedLexicalFallback: boolean;
+  /** True when the offline embedder produced the query vector (vector search still ran). */
+  embeddingUsedFallback: boolean;
   model: string;
 }
 
@@ -138,7 +141,7 @@ export async function retrieve(queryText: string, limit = 4): Promise<RetrievalO
   );
 
   if (Number(embedded?.count ?? 0) === 0) {
-    return { ...(await lexicalRetrieve(queryText, limit)), model: 'postgres-fts' };
+    return { ...(await lexicalRetrieve(queryText, limit)), embeddingUsedFallback: false, model: 'postgres-fts' };
   }
 
   try {
@@ -173,12 +176,16 @@ export async function retrieve(queryText: string, limit = 4): Promise<RetrievalO
         content: r.content,
         score: Math.max(0, 1 - Number(r.distance)),
       })),
-      usedLexicalFallback: outcome.usedFallback,
+      // Vector search ran, so this is NOT the lexical fallback — that flag was
+      // previously set from the embedder's fallback status, which mislabelled
+      // every deterministic-embedder search as a full-text search.
+      usedLexicalFallback: false,
+      embeddingUsedFallback: outcome.usedFallback,
       model: outcome.model,
     };
   } catch (error) {
     log.warn({ err: (error as Error).message }, 'vector retrieval failed - using lexical search');
-    return { ...(await lexicalRetrieve(queryText, limit)), model: 'postgres-fts' };
+    return { ...(await lexicalRetrieve(queryText, limit)), embeddingUsedFallback: false, model: 'postgres-fts' };
   }
 }
 
