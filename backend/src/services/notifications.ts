@@ -1,4 +1,7 @@
 import { query } from '../db/pool';
+import { loggerFor } from '../observability/logger';
+
+const log = loggerFor('notifications');
 
 export type NotificationType =
   | 'TICKET_CREATED'
@@ -27,7 +30,7 @@ export async function notify(
       [userId, type, title, body, ticketId]
     );
   } catch (error) {
-    console.error('[notifications] failed to create notification:', (error as Error).message);
+    log.error({ err: (error as Error).message, type }, 'failed to create notification');
   }
 }
 

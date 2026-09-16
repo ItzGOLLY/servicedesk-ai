@@ -1,5 +1,7 @@
 # ServiceDesk AI
 
+[![CI](https://github.com/ItzGOLLY/servicedesk-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/ItzGOLLY/servicedesk-ai/actions/workflows/ci.yml)
+
 **A cloud-native customer support SaaS platform for small businesses.**
 
 Receive customer complaints, turn them into trackable support tickets, route them to the right agent, and give that agent AI assistance — classification, summaries and draft replies — so small teams can respond like large ones.
@@ -37,12 +39,14 @@ The table below reflects what is **actually built and verified**, not what is pl
 
 **Verified by running it, not by assuming:**
 
-- Backend typecheck passes; frontend builds under strict TypeScript
-- Migrations apply cleanly to a real PostgreSQL instance
-- **127 automated tests pass (127/127)** against a real database — see [`docs/TESTING.md`](docs/TESTING.md)
-- All three roles exercised end to end in a browser: registration, ticket creation with live AI classification, the agent AI draft-and-edit flow, admin dashboards, and the 375 px mobile layout
+- Backend and frontend typecheck and build under strict TypeScript
+- **`docker compose up` brings up the whole stack** — pgvector Postgres, migrations, seed, API, frontend — verified working
+- **153 automated tests pass** against a real PostgreSQL using production migrations
+- **CI is green** on GitHub Actions: backend, frontend and Docker image builds
+- RAG verified end to end: articles chunked, embedded, retrieved by cosine similarity, answered with citations
+- AI metrics measured, not asserted — see [AI evaluation](#ai-evaluation)
 
-**Not yet done:** the application is **not deployed**. No hosting account has been provisioned, so there is no live URL. [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) documents every step; [`docs/FINAL_COMPLIANCE_CHECKLIST.md`](docs/FINAL_COMPLIANCE_CHECKLIST.md) records exactly what is and is not complete.
+**Not deployed.** No hosting account has been provisioned, so **there is no live URL and none is claimed**. [`render.yaml`](render.yaml) is a complete Render Blueprint and [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) documents every step; deployment needs account access.
 
 ---
 
@@ -104,6 +108,65 @@ The AI layer exists because small teams do not have a triage person. When a tick
 | Dashboard insights | Sentiment and category patterns from real ticket data | Read-only analytics |
 
 > **Design note.** AI is a value-add, not a course requirement — the official Project 19 specification does not mention AI. The system is therefore built so that **no mandatory feature depends on it**. If the AI provider is unreachable, the service falls back to a deterministic rule-based classifier and every core workflow — ticket creation, CRUD, dashboards, reports — continues to work unchanged.
+
+---
+
+## Quick start (Docker)
+
+```bash
+docker compose up -d --build
+```
+
+| Service | URL |
+|---|---|
+| Application | http://localhost:8080 |
+| API | http://localhost:4000/api |
+| **API docs (Swagger)** | http://localhost:4000/api/docs |
+| OpenAPI spec | http://localhost:4000/api/openapi.json |
+| Health | http://localhost:4000/api/health |
+
+Sign in as `admin@servicedesk.ai` / `Admin@12345` (also `priya.agent@servicedesk.ai` / `Agent@12345`, `rohan@example.com` / `Customer@12345`).
+
+Compose starts `pgvector/pgvector:pg16`, runs migrations and seed as a one-shot service, then the API and frontend. No host dependencies beyond Docker.
+
+---
+
+## Knowledge base and RAG
+
+Agents can answer a ticket from the business's own documented material rather than from model knowledge.
+
+```
+article → chunk (paragraph → sentence, ~700 chars, 100 overlap, title prefixed)
+        → embed (384-dim)
+        → kb_chunks  VECTOR(384), HNSW cosine index
+ticket  → embed query → cosine similarity → top-k published passages
+        → LLM answers ONLY from those passages
+        → citations, filtered against the passages actually supplied
+```
+
+- **pgvector, not a separate vector database** — the corpus is small and already relational, so this keeps one datastore, one backup and one connection pool.
+- **HNSW, not IVFFlat.** IVFFlat trains centroids at build time; created on an empty table it silently returned 1 row where 4 matched. See `src/db/migrations/004_hnsw_index.sql`.
+- **Retrieval degrades**: no embeddings → PostgreSQL full-text search.
+- **Prompt injection defence**: passages are delimited and declared as data, delimiters are stripped from content, and invented citations are discarded.
+
+---
+
+## AI evaluation
+
+`npm run eval` measures the AI layer against 30 hand-labelled tickets. Reproducible from the repository.
+
+**Offline providers (default — deterministic classifier and lexical embeddings):**
+
+| Metric | Result | Random baseline |
+|---|---|---|
+| Category accuracy | **76.7%** (23/30) | 20.0% |
+| Priority exact | 60.0% (18/30) | 25.0% |
+| Priority within one band | **93.3%** (28/30) | — |
+| Retrieval hit@1 | 46.2% (6/13) | 33.3% |
+| Retrieval hit@3 | 61.5% (8/13) | — |
+| Robustness (malformed, hostile, injection) | **4/4 structurally valid** | — |
+
+> These numbers measure a **keyword classifier and lexical retrieval**, not a language model. The offline embedding provider is a hashed bag-of-words and is **not semantic** — it matches word overlap, not meaning. Set `AI_PROVIDER=anthropic` and `EMBEDDING_PROVIDER=openai` and re-run the same command to compare.
 
 ---
 

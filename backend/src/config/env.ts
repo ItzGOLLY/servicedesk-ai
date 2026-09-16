@@ -21,6 +21,7 @@ function optional(name: string, fallback: string): string {
 
 export const env = {
   nodeEnv: optional('NODE_ENV', 'development'),
+  logLevel: optional('LOG_LEVEL', 'info'),
   port: Number(optional('PORT', '4000')),
 
   databaseUrl: required('DATABASE_URL'),
@@ -52,6 +53,15 @@ export const env = {
   // The exact public URL the provider posts to; it is part of the signature.
   whatsappWebhookUrl: process.env.WHATSAPP_WEBHOOK_URL ?? '',
   whatsappTimeoutMs: Number(optional('WHATSAPP_TIMEOUT_MS', '10000')),
+
+  // Embeddings for knowledge-base retrieval.
+  // 'deterministic' computes lexical vectors locally with no network or key;
+  // 'openai' calls an OpenAI-compatible embeddings endpoint.
+  embeddingProvider: optional('EMBEDDING_PROVIDER', 'deterministic'),
+  embeddingApiKey: process.env.EMBEDDING_API_KEY ?? '',
+  embeddingBaseUrl: optional('EMBEDDING_BASE_URL', 'https://api.openai.com/v1'),
+  embeddingModel: optional('EMBEDDING_MODEL', 'text-embedding-3-small'),
+  embeddingTimeoutMs: Number(optional('EMBEDDING_TIMEOUT_MS', '15000')),
 
   seedAdminEmail: optional('SEED_ADMIN_EMAIL', 'admin@servicedesk.ai'),
   seedAdminPassword: optional('SEED_ADMIN_PASSWORD', 'Admin@12345'),

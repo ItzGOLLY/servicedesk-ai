@@ -17,6 +17,9 @@ import {
 } from '../../services/whatsapp';
 import { handleInbound } from './whatsapp.service';
 import { isTest } from '../../config/env';
+import { loggerFor } from '../../observability/logger';
+
+const log = loggerFor('whatsapp');
 
 export const whatsappRouter = Router();
 
@@ -58,10 +61,10 @@ whatsappRouter.post(
       for (const message of messages) {
         const outcome = await handleInbound(message, whatsappStatus.active);
         if (outcome.handled) processed += 1;
-        else console.warn(`[whatsapp] not handled: ${outcome.reason}`);
+        else log.warn({ reason: outcome.reason }, 'inbound WhatsApp message not handled');
       }
     } catch (error) {
-      console.error('[whatsapp] webhook processing failed:', (error as Error).message);
+      log.error({ err: (error as Error).message }, 'webhook processing failed');
     }
 
     res.status(200).json({ success: true, data: { processed } });

@@ -1,6 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ApiError } from '../utils/ApiError';
 import { isProduction } from '../config/env';
+import { loggerFor } from '../observability/logger';
+
+const log = loggerFor('http');
 
 /** 404 for any route that did not match. */
 export function notFoundHandler(req: Request, res: Response): void {
@@ -63,7 +66,7 @@ export function errorHandler(
     return;
   }
 
-  console.error(`[error] ${req.method} ${req.originalUrl}`, error);
+  log.error({ err: error, method: req.method, url: req.originalUrl, reqId: req.id }, 'unhandled error');
 
   res.status(500).json({
     success: false,

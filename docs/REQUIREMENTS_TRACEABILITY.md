@@ -16,7 +16,7 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 | G-3 | Role-Based Access | Route role middleware plus record ownership checks | `middleware/rbac.ts`, `middleware/auth.ts`, `tickets.service.ts` | R-01 – R-26 | 6, 11 | ✅ |
 | G-4 | CRUD Operations | Ticket create/read/update/delete; user and category CRUD | `modules/tickets/`, `modules/user-management/`, `modules/administration/` | T-01 – T-14 | 3, 9, 12 | ✅ |
 | G-5 | Dashboard & Reports | Three role dashboards; seven reports; CSV export | `modules/reports/`, `pages/admin/AdminDashboard.tsx`, `pages/admin/Reports.tsx` | Manual (browser) | 12, 13 | ✅ |
-| G-6 | Cloud Database | Managed PostgreSQL, versioned SQL migrations | `db/migrations/001_init.sql`, `db/pool.ts` | Whole suite runs on real PostgreSQL | 14 | 🟡 |
+| G-6 | Cloud Database | Managed PostgreSQL, versioned SQL migrations | `db/migrations/00*.sql`, `db/pool.ts` | Whole suite runs on real PostgreSQL | 14 | 🟡 |
 | G-7 | REST APIs | ~40 endpoints across 9 groups, consistent envelopes | `app.ts` and all `*.routes.ts` | Whole suite via supertest | 15 | ✅ |
 | G-8 | Responsive UI | Tailwind design system, responsive from 375 px | `index.css`, `AppShell.tsx`, all pages | Manual at 375 / 768 / 1280 | 10 | ✅ |
 | G-9 | Live Cloud Deployment | Vercel + Render + Supabase | `DEPLOYMENT.md`, `vercel.json` | — | 1 | ⬜ |
@@ -62,7 +62,7 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 | NFR-2 | Scalability | Stateless API, bounded pool, pagination, CDN frontend | `CLOUD_ARCHITECTURE.md` §8 | ✅ |
 | NFR-3 | Availability | Managed services, `/api/health`, graceful shutdown, AI degradation | AI-11, health endpoint | ✅ |
 | NFR-4 | Performance | Indexes on every filter column, GIN search index, pagination, client caching, AI off the critical path | `DATABASE_DESIGN.md` §4.3 | ✅ |
-| NFR-5 | Reliability | DB constraints, single lifecycle table, transactions, audit log | T-16 – T-21, L-01 – L-05 | ✅ |
+| NFR-5 | Reliability | DB constraints, single lifecycle table, transactions (status change + assignment), audit log | T-16 – T-21, L-01 – L-05 | ✅ |
 | NFR-6 | Usability | One design system, responsive, explicit loading/empty/error states | Manual | ✅ |
 
 ---
@@ -117,7 +117,7 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 | Public Live URL | Pending deployment | ⬜ |
 | Responsive UI | Verified at 375 / 768 / 1280 | ✅ |
 | Cloud Database | Pending provisioning | ⬜ |
-| Testing | 92 automated tests, all passing; `TESTING.md` | ✅ |
+| Testing | 153 automated tests, all passing; CI green; `TESTING.md` | ✅ |
 | Final Report | Cover page done; body assembles from these docs per the A2 22-section template | 🟡 |
 | PPT | R1 deck delivered; R3 deck to be built from it | 🟡 |
 | GitHub Repository | Public, with history | ✅ |

@@ -335,7 +335,7 @@ The six quality attributes required by the specification.
 ### NFR-5 — Reliability
 - Business invariants enforced by database constraints as well as application code.
 - Lifecycle transitions validated server-side from a single transition table.
-- Related writes wrapped in transactions.
+- Related writes wrapped in transactions: a status change or assignment writes the ticket row and its timeline event atomically.
 - Every privileged action recorded in an audit log; every ticket change recorded on its timeline.
 - Inbound WhatsApp deliveries are idempotent, so provider retries cannot duplicate tickets.
 

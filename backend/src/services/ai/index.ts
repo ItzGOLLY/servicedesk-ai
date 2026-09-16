@@ -3,6 +3,8 @@ import { AnthropicAiProvider } from './anthropic.provider';
 import { FallbackAiProvider } from './fallback.provider';
 import type {
   AiProvider,
+  GroundedAnswerResult,
+  GroundingPassage,
   ClassificationResult,
   ConversationContext,
   DraftReplyResult,
@@ -10,6 +12,9 @@ import type {
   SummaryResult,
   TicketContext,
 } from './types';
+import { loggerFor } from '../../observability/logger';
+
+const log = loggerFor('ai');
 
 export * from './types';
 
@@ -24,7 +29,7 @@ const fallback = new FallbackAiProvider();
 function selectProvider(): AiProvider {
   if (env.aiProvider === 'anthropic') {
     if (!env.aiApiKey) {
-      console.warn('[ai] AI_PROVIDER=anthropic but AI_API_KEY is empty — using fallback.');
+      log.warn('AI_PROVIDER=anthropic but AI_API_KEY is empty - using fallback');
       return fallback;
     }
     return new AnthropicAiProvider();
@@ -66,7 +71,7 @@ async function attempt<T>(
   try {
     return { result: await primary(), usedFallback: false, model: provider.name };
   } catch (error) {
-    console.warn(`[ai] ${operation} failed (${(error as Error).message}) — using fallback.`);
+    log.warn({ operation, err: (error as Error).message }, 'AI call failed - using fallback');
     return { result: await degraded(), usedFallback: true, model: fallback.name };
   }
 }
@@ -81,6 +86,17 @@ export function draftReply(ctx: ConversationContext): Promise<AiOutcome<DraftRep
 
 export function summariseTicket(ctx: ConversationContext): Promise<AiOutcome<SummaryResult>> {
   return attempt('summarise', () => provider.summarise(ctx), () => fallback.summarise(ctx));
+}
+
+export function answerFromKnowledge(
+  ctx: ConversationContext,
+  passages: GroundingPassage[]
+): Promise<AiOutcome<GroundedAnswerResult>> {
+  return attempt(
+    'answerFromKnowledge',
+    () => provider.answerFromKnowledge(ctx, passages),
+    () => fallback.answerFromKnowledge(ctx, passages)
+  );
 }
 
 export function resolutionSteps(

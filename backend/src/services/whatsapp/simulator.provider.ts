@@ -1,5 +1,8 @@
 import { isProduction } from '../../config/env';
 import type { InboundMessage, OutboundMessage, SendResult, WhatsAppProvider } from './types';
+import { loggerFor } from '../../observability/logger';
+
+const log = loggerFor('whatsapp:simulator');
 
 /**
  * A WhatsApp provider that sends nothing.
@@ -27,8 +30,9 @@ export class SimulatorWhatsAppProvider implements WhatsAppProvider {
     // is omitted outside development. The admin console and the
     // whatsapp_messages table are the intended way to inspect content.
     if (!isProduction) {
-      console.log(
-        `[whatsapp:simulator] → ••••${message.to.slice(-4)} (${message.body.length} chars)`
+      log.info(
+        { to: `****${message.to.slice(-4)}`, chars: message.body.length },
+        'simulated WhatsApp send'
       );
     }
     return {

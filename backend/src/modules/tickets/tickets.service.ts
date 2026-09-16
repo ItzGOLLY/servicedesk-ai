@@ -1,8 +1,12 @@
+import type { PoolClient } from 'pg';
 import { query, queryOne } from '../../db/pool';
 import { ApiError } from '../../utils/ApiError';
 import { classifyTicket } from '../../services/ai';
 import type { AuthenticatedUser, TicketStatus } from '../../types';
 import type { ListTicketsQuery } from './tickets.schemas';
+import { loggerFor } from '../../observability/logger';
+
+const log = loggerFor('tickets');
 
 /** Columns every ticket response is built from, joined to human-readable names. */
 const TICKET_SELECT = `
@@ -188,18 +192,27 @@ export async function getTicketForUser(
   return ticket;
 }
 
+/**
+ * Appends to a ticket's timeline.
+ *
+ * Accepts an optional transaction client so the event can be written in the
+ * same transaction as the change it describes — a status row and its timeline
+ * entry must both land or neither must.
+ */
 export async function recordEvent(
   ticketId: string,
   actorId: string | null,
   eventType: string,
   fromValue: string | null,
-  toValue: string | null
+  toValue: string | null,
+  client?: PoolClient
 ): Promise<void> {
-  await query(
-    `INSERT INTO ticket_events (ticket_id, actor_id, event_type, from_value, to_value)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [ticketId, actorId, eventType, fromValue, toValue]
-  );
+  const sql = `INSERT INTO ticket_events (ticket_id, actor_id, event_type, from_value, to_value)
+               VALUES ($1, $2, $3, $4, $5)`;
+  const params = [ticketId, actorId, eventType, fromValue, toValue];
+
+  if (client) await client.query(sql, params);
+  else await query(sql, params);
 }
 
 /**
@@ -250,6 +263,6 @@ export async function classifyAndStore(ticketId: string): Promise<void> {
       [ticketId, JSON.stringify(outcome.result), outcome.model, outcome.usedFallback]
     );
   } catch (error) {
-    console.error('[tickets] classification failed:', (error as Error).message);
+    log.error({ err: (error as Error).message, ticketId }, 'classification failed');
   }
 }

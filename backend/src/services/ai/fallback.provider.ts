@@ -1,5 +1,7 @@
 import type {
   AiProvider,
+  GroundedAnswerResult,
+  GroundingPassage,
   ClassificationResult,
   ConversationContext,
   DraftReplyResult,
@@ -131,6 +133,37 @@ export class FallbackAiProvider implements AiProvider {
       summary:
         `${summarise(ctx.subject, ctx.description)}` +
         (replies > 0 ? ` (${replies} ${replies === 1 ? 'reply' : 'replies'} in thread)` : ''),
+    };
+  }
+
+  /**
+   * Without a language model there is nothing that can synthesise an answer, so
+   * the highest-ranked passage is returned verbatim and clearly attributed.
+   * Quoting a real article is honest; paraphrasing it with string manipulation
+   * would risk changing its meaning.
+   */
+  async answerFromKnowledge(
+    _ctx: ConversationContext,
+    passages: GroundingPassage[]
+  ): Promise<GroundedAnswerResult> {
+    if (passages.length === 0) {
+      return {
+        answer:
+          'I could not find anything in our knowledge base covering this. ' +
+          'An agent will review it directly.',
+        citedIds: [],
+        insufficient: true,
+      };
+    }
+
+    const top = passages[0];
+    return {
+      answer:
+        `From our knowledge base article "${top.title}":
+
+${top.content.trim()}`,
+      citedIds: [top.id],
+      insufficient: false,
     };
   }
 

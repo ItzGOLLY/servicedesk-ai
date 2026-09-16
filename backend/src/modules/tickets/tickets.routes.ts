@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { query, queryOne } from '../../db/pool';
+import { query, queryOne, withTransaction } from '../../db/pool';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validate } from '../../middleware/validate';
@@ -146,14 +146,17 @@ ticketsRouter.patch(
     const closedExpr =
       stamps.closedAt === 'NOW' ? 'NOW()' : stamps.closedAt === 'NULL' ? 'NULL' : 'closed_at';
 
-    await query(
-      `UPDATE tickets
-          SET status = $1, resolved_at = ${resolvedExpr}, closed_at = ${closedExpr}
-        WHERE id = $2`,
-      [status, ticket.id]
-    );
-
-    await recordEvent(ticket.id, req.user!.id, 'STATUS_CHANGED', ticket.status, status);
+    // The status row and its timeline entry must both land or neither must:
+    // a status change with no event leaves the audit trail lying about history.
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE tickets
+            SET status = $1, resolved_at = ${resolvedExpr}, closed_at = ${closedExpr}
+          WHERE id = $2`,
+        [status, ticket.id]
+      );
+      await recordEvent(ticket.id, req.user!.id, 'STATUS_CHANGED', ticket.status, status, client);
+    });
     await recordAudit(req, 'TICKET_STATUS_CHANGED', 'ticket', ticket.id, {
       from: ticket.status,
       to: status,
@@ -212,22 +215,25 @@ ticketsRouter.patch(
       if (!agent.is_active) throw ApiError.unprocessable('That account is deactivated.');
     }
 
-    await query(
-      `UPDATE tickets
-          SET assigned_agent_id = $1,
-              -- picking up a brand-new ticket also opens it
-              status = CASE WHEN status = 'NEW' AND $1::UUID IS NOT NULL THEN 'OPEN' ELSE status END
-        WHERE id = $2`,
-      [agentId, ticket.id]
-    );
-
-    await recordEvent(
-      ticket.id,
-      req.user!.id,
-      agentId ? 'ASSIGNED' : 'UNASSIGNED',
-      ticket.assigned_agent_id,
-      agentId
-    );
+    // Assignment can also change status, so the write and its event are atomic.
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE tickets
+            SET assigned_agent_id = $1,
+                -- picking up a brand-new ticket also opens it
+                status = CASE WHEN status = 'NEW' AND $1::UUID IS NOT NULL THEN 'OPEN' ELSE status END
+          WHERE id = $2`,
+        [agentId, ticket.id]
+      );
+      await recordEvent(
+        ticket.id,
+        req.user!.id,
+        agentId ? 'ASSIGNED' : 'UNASSIGNED',
+        ticket.assigned_agent_id,
+        agentId,
+        client
+      );
+    });
     await recordAudit(req, 'TICKET_ASSIGNED', 'ticket', ticket.id, { agentId });
 
     if (agentId && agentId !== req.user!.id) {
@@ -391,6 +397,20 @@ ticketsRouter.post(
         'A support agent has replied to your request.',
         ticket.id
       );
+
+      // Posting a reply flagged as AI-assisted is what "accepting" a draft means,
+      // so the most recent draft for this ticket is marked accordingly. This is
+      // what makes the acceptance figure on the admin dashboard real rather
+      // than a column that is always false.
+      if (aiAssisted) {
+        await query(
+          `UPDATE ai_suggestions SET was_accepted = TRUE
+            WHERE id = (SELECT id FROM ai_suggestions
+                         WHERE ticket_id = $1 AND kind = 'DRAFT_REPLY'
+                         ORDER BY created_at DESC LIMIT 1)`,
+          [ticket.id]
+        );
+      }
 
       // The agent writes once, in the web application; if the customer came in
       // over WhatsApp the same reply is delivered to their chat, converted from
