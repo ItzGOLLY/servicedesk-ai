@@ -6,7 +6,18 @@
  * is allowed to see.
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api';
+/**
+ * Normalises the configured origin so a value with or without the `/api`
+ * suffix, or with a trailing slash, all resolve to the same base. The most
+ * common deployment mistake is setting only the host.
+ */
+export function resolveApiBase(configured: string | undefined): string {
+  const trimmed = (configured ?? '').trim().replace(/\/+$/, '');
+  if (trimmed === '') return 'http://localhost:4000/api';
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+}
+
+const BASE_URL = resolveApiBase(import.meta.env.VITE_API_BASE_URL);
 
 /** Kept in memory only — never localStorage, so an XSS payload cannot read it. */
 let accessToken: string | null = null;

@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { api, getAccessToken } from '../../lib/api';
+import { api, getAccessToken, resolveApiBase } from '../../lib/api';
 import { Card, ErrorNotice, LoadingBlock, PageHeader } from '../../components/ui';
 import { formatHours, humanise } from '../../lib/format';
 import type { LabelCount } from '../../lib/types';
@@ -67,7 +67,7 @@ export default function Reports() {
    * so it is fetched and turned into a blob rather than opened as a plain link.
    */
   const downloadCsv = async () => {
-    const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api';
+    const base = resolveApiBase(import.meta.env.VITE_API_BASE_URL);
     const response = await fetch(`${base}/reports/export?format=csv`, {
       credentials: 'include',
       headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
