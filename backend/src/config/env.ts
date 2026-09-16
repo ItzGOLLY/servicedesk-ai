@@ -71,9 +71,10 @@ export const env = {
   whatsappWebhookUrl: process.env.WHATSAPP_WEBHOOK_URL ?? '',
   whatsappTimeoutMs: Number(optional('WHATSAPP_TIMEOUT_MS', '10000')),
   // Optional Content Template (HX...) for senders that only accept templates,
-  // and the template variable the reply text is placed in.
+  // and the template variable the reply text is placed in (blank when the
+  // template has no variables).
   whatsappContentSid: process.env.WHATSAPP_CONTENT_SID ?? '',
-  whatsappContentVariable: optional('WHATSAPP_CONTENT_VARIABLE', '1'),
+  whatsappContentVariable: (process.env.WHATSAPP_CONTENT_VARIABLE ?? '').trim(),
 
   // Embeddings for knowledge-base retrieval.
   // 'deterministic' computes lexical vectors locally with no network or key;

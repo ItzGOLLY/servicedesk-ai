@@ -35,12 +35,16 @@ export class TwilioWhatsAppProvider implements WhatsAppProvider {
       // and only delivers pre-approved Content Templates. When a template SID
       // is configured the reply is carried in that template's variable; the
       // sandbox and production senders accept a plain Body instead.
+      // A template without a variable slot delivers its fixed wording only;
+      // the composed reply is still recorded in the message log.
       if (env.whatsappContentSid) {
         form.set('ContentSid', env.whatsappContentSid);
-        form.set(
-          'ContentVariables',
-          JSON.stringify({ [env.whatsappContentVariable]: message.body })
-        );
+        if (env.whatsappContentVariable) {
+          form.set(
+            'ContentVariables',
+            JSON.stringify({ [env.whatsappContentVariable]: message.body })
+          );
+        }
       } else {
         form.set('Body', message.body);
       }
