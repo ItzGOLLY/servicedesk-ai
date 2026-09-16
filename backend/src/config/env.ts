@@ -19,6 +19,21 @@ function optional(name: string, fallback: string): string {
   return value && value.trim() !== '' ? value : fallback;
 }
 
+/**
+ * Reduces a configured value to the `scheme://host[:port]` form the browser
+ * puts in the Origin header. Returns '' for values that cannot be parsed.
+ */
+export function normaliseOrigin(raw: string): string {
+  const cleaned = raw.trim().replace(/^['"]+|['"]+$/g, '');
+  if (cleaned === '') return '';
+  const withScheme = /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+  try {
+    return new URL(withScheme).origin;
+  } catch {
+    return '';
+  }
+}
+
 export const env = {
   nodeEnv: optional('NODE_ENV', 'development'),
   logLevel: optional('LOG_LEVEL', 'info'),
@@ -33,9 +48,11 @@ export const env = {
   refreshTokenTtl: optional('REFRESH_TOKEN_TTL', '7d'),
 
   // Comma-separated so a preview deployment and production can both be allowed.
+  // Each entry is reduced to a bare origin, so a value pasted with a path,
+  // trailing slash, quotes or no scheme still matches what the browser sends.
   corsOrigins: optional('CORS_ORIGIN', 'http://localhost:5173')
     .split(',')
-    .map((o) => o.trim())
+    .map(normaliseOrigin)
     .filter(Boolean),
 
   aiProvider: optional('AI_PROVIDER', 'fallback'),
