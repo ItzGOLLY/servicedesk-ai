@@ -62,7 +62,7 @@ export const env = {
 
   // WhatsApp channel.
   // 'simulator' records messages without sending them, so the feature works
-  // with no external account; 'twilio' sends real messages.
+  // with no external account; 'twilio' and 'meta' send real messages.
   whatsappProvider: optional('WHATSAPP_PROVIDER', 'simulator'),
   whatsappAccountSid: process.env.WHATSAPP_ACCOUNT_SID ?? '',
   whatsappAuthToken: process.env.WHATSAPP_AUTH_TOKEN ?? '',
@@ -75,6 +75,12 @@ export const env = {
   // template has no variables).
   whatsappContentSid: process.env.WHATSAPP_CONTENT_SID ?? '',
   whatsappContentVariable: (process.env.WHATSAPP_CONTENT_VARIABLE ?? '').trim(),
+  // Meta Cloud API ('meta' provider).
+  whatsappAccessToken: process.env.WHATSAPP_ACCESS_TOKEN ?? '',
+  whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? '',
+  whatsappAppSecret: process.env.WHATSAPP_APP_SECRET ?? '',
+  whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN ?? '',
+  whatsappGraphVersion: optional('WHATSAPP_GRAPH_VERSION', 'v22.0'),
 
   // Embeddings for knowledge-base retrieval.
   // 'deterministic' computes lexical vectors locally with no network or key;

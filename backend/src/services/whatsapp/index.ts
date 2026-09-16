@@ -3,6 +3,7 @@ import { query, queryOne } from '../../db/pool';
 import { notifyAdmins } from '../notifications';
 import { SimulatorWhatsAppProvider } from './simulator.provider';
 import { TwilioWhatsAppProvider } from './twilio.provider';
+import { MetaWhatsAppProvider } from './meta.provider';
 import type { InboundMessage, WhatsAppProvider } from './types';
 import { loggerFor } from '../../observability/logger';
 
@@ -27,6 +28,13 @@ function selectProvider(): WhatsAppProvider {
       return simulator;
     }
     return new TwilioWhatsAppProvider();
+  }
+  if (env.whatsappProvider === 'meta') {
+    if (!env.whatsappAccessToken || !env.whatsappPhoneNumberId || !env.whatsappAppSecret) {
+      log.warn('[whatsapp] provider=meta but credentials are incomplete — using simulator.');
+      return simulator;
+    }
+    return new MetaWhatsAppProvider();
   }
   return simulator;
 }

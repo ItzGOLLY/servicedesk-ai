@@ -13,6 +13,9 @@ import { closePool, query, queryOne } from '../src/db/pool';
 import { handleInbound } from '../src/modules/whatsapp/whatsapp.service';
 import { normaliseNumber } from '../src/services/whatsapp';
 import * as t from '../src/services/whatsapp/format';
+import { MetaWhatsAppProvider } from '../src/services/whatsapp/meta.provider';
+import { env } from '../src/config/env';
+import crypto from 'node:crypto';
 
 const NUMBER = '+919000000001';
 let counter = 0;
@@ -98,6 +101,48 @@ describe('WhatsApp number normalisation (unit)', () => {
     expect(normaliseNumber('hello')).toBeNull();
     expect(normaliseNumber('+0123')).toBeNull();
     expect(normaliseNumber('')).toBeNull();
+  });
+});
+
+describe('Meta Cloud API provider (unit)', () => {
+  const meta = new MetaWhatsAppProvider();
+  const webhook = (value: Record<string, unknown>) => ({
+    object: 'whatsapp_business_account',
+    entry: [{ id: '1', changes: [{ field: 'messages', value }] }],
+  });
+
+  it('normalises an inbound text message to E.164 with a provider id', () => {
+    const parsed = meta.parseWebhook(
+      webhook({
+        messages: [{ id: 'wamid.ABC', from: '919000000001', type: 'text', text: { body: 'hi' } }],
+      })
+    );
+    expect(parsed).toEqual([{ providerMessageId: 'wamid.ABC', from: '+919000000001', body: 'hi' }]);
+  });
+
+  it('ignores delivery-status callbacks and non-text messages', () => {
+    expect(meta.parseWebhook(webhook({ statuses: [{ id: 'wamid.X', status: 'read' }] }))).toEqual([]);
+    expect(
+      meta.parseWebhook(webhook({ messages: [{ id: 'wamid.Y', from: '919000000001', type: 'image' }] }))
+    ).toEqual([]);
+    expect(meta.parseWebhook({ object: 'page' })).toEqual([]);
+    expect(meta.parseWebhook(undefined)).toEqual([]);
+  });
+
+  it('accepts a body signed with the app secret and rejects anything else', () => {
+    const secret = 'unit-test-app-secret';
+    const original = env.whatsappAppSecret;
+    (env as { whatsappAppSecret: string }).whatsappAppSecret = secret;
+    try {
+      const raw = JSON.stringify({ object: 'whatsapp_business_account', entry: [] });
+      const good = 'sha256=' + crypto.createHmac('sha256', secret).update(raw).digest('hex');
+      expect(meta.verifySignature(raw, { 'x-hub-signature-256': good })).toBe(true);
+      expect(meta.verifySignature(raw + ' ', { 'x-hub-signature-256': good })).toBe(false);
+      expect(meta.verifySignature(raw, { 'x-hub-signature-256': 'sha256=00' })).toBe(false);
+      expect(meta.verifySignature(raw, {})).toBe(false);
+    } finally {
+      (env as { whatsappAppSecret: string }).whatsappAppSecret = original;
+    }
   });
 });
 
