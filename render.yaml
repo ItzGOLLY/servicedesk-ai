@@ -19,6 +19,9 @@ databases:
     databaseName: servicedesk
     user: servicedesk
     plan: free
+    # Must match the API's region: the internal connection string wired into
+    # DATABASE_URL only resolves from services in the same region.
+    region: singapore
     # Render's PostgreSQL includes pgvector; migration 003 enables the
     # extension itself, so no manual step is required.
     postgresMajorVersion: '16'
