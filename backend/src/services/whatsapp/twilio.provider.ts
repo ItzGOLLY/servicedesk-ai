@@ -29,8 +29,21 @@ export class TwilioWhatsAppProvider implements WhatsAppProvider {
       const form = new URLSearchParams({
         To: `whatsapp:${message.to}`,
         From: `whatsapp:${env.whatsappFromNumber}`,
-        Body: message.body,
       });
+
+      // Twilio's trial WhatsApp sender refuses free-form text (error 21654)
+      // and only delivers pre-approved Content Templates. When a template SID
+      // is configured the reply is carried in that template's variable; the
+      // sandbox and production senders accept a plain Body instead.
+      if (env.whatsappContentSid) {
+        form.set('ContentSid', env.whatsappContentSid);
+        form.set(
+          'ContentVariables',
+          JSON.stringify({ [env.whatsappContentVariable]: message.body })
+        );
+      } else {
+        form.set('Body', message.body);
+      }
 
       const auth = Buffer.from(
         `${env.whatsappAccountSid}:${env.whatsappAuthToken}`
