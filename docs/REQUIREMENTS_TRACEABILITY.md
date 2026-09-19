@@ -4,7 +4,9 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 
 **Sources** — A1: Project Guidelines · A2: Review Schedule & Report Template · A3: Project List, Project 19
 
-**Status** — ✅ Done and verified · 🟡 Built, awaiting deployment · ⬜ Not started
+**Status** — ✅ Done and verified · 🟡 Requires your preparation · ⬜ Deliberately out of scope
+
+**Live:** app https://servicedesk-ai-two.vercel.app · API https://servicedesk-api-ss2d.onrender.com/api · deployed 19 September 2026
 
 ---
 
@@ -16,10 +18,10 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 | G-3 | Role-Based Access | Route role middleware plus record ownership checks | `middleware/rbac.ts`, `middleware/auth.ts`, `tickets.service.ts` | R-01 – R-26 | 6, 11 | ✅ |
 | G-4 | CRUD Operations | Ticket create/read/update/delete; user and category CRUD | `modules/tickets/`, `modules/user-management/`, `modules/administration/` | T-01 – T-14 | 3, 9, 12 | ✅ |
 | G-5 | Dashboard & Reports | Three role dashboards; seven reports; CSV export | `modules/reports/`, `pages/admin/AdminDashboard.tsx`, `pages/admin/Reports.tsx` | Manual (browser) | 12, 13 | ✅ |
-| G-6 | Cloud Database | Managed PostgreSQL, versioned SQL migrations | `db/migrations/00*.sql`, `db/pool.ts` | Whole suite runs on real PostgreSQL | 14 | 🟡 |
+| G-6 | Cloud Database | Managed PostgreSQL 16 + pgvector on Render, versioned SQL migrations | `db/migrations/00*.sql`, `db/pool.ts`, `render.yaml` | Whole suite runs on real PostgreSQL; live health check | 14 | ✅ |
 | G-7 | REST APIs | ~40 endpoints across 9 groups, consistent envelopes | `app.ts` and all `*.routes.ts` | Whole suite via supertest | 15 | ✅ |
 | G-8 | Responsive UI | Tailwind design system, responsive from 375 px | `index.css`, `AppShell.tsx`, all pages | Manual at 375 / 768 / 1280 | 10 | ✅ |
-| G-9 | Live Cloud Deployment | Vercel + Render + Supabase | `DEPLOYMENT.md`, `vercel.json` | — | 1 | ⬜ |
+| G-9 | Live Cloud Deployment | Vercel (frontend) + Render (API + PostgreSQL) | `render.yaml`, `frontend/vercel.json`, `DEPLOY_TOMORROW.md` | Live URLs above | 1 | ✅ |
 | G-10 | GitHub Repository | Public repo, meaningful commits, README, .gitignore | github.com/ItzGOLLY/servicedesk-ai | — | 16 | ✅ |
 
 ---
@@ -30,10 +32,10 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 |---|---|---|---|
 | G-1 | Team of exactly two students | Aarush Jagannathan (23BLC1211), Gomatheswar M (23BLC1195) | ✅ |
 | G-11 | One repo, regular commits, meaningful README, no copied repos | Repository history; `README.md` | ✅ |
-| G-12 | Public URL; localhost-only is not complete | `DEPLOYMENT.md` — not yet executed | ⬜ |
+| G-12 | Public URL; localhost-only is not complete | https://servicedesk-ai-two.vercel.app | ✅ |
 | G-13 | Every member can explain **or modify** any line | `VIVA_PREPARATION.md` incl. a "modify it now" rehearsal table; per-module comments | 🟡 *(requires your study, not code)* |
 | G-14 | No copied code, no purchased templates | All original; design system hand-built, no UI kit | ✅ |
-| G-15 | Final submission: Report, PPT, Repo, Live URL, Source, Demo | Report cover + PPT delivered; live URL pending | 🟡 |
+| G-15 | Final submission: Report, PPT, Repo, Live URL, Source, Demo | Report, PPT, repository, live URL, source, demo script all present | ✅ |
 
 ---
 
@@ -49,7 +51,7 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 | FR-6 | Dashboard | `modules/reports/dashboard.routes.ts` | Manual (browser) | ✅ |
 | FR-7 | Notifications | `services/notifications.ts`, `notifications.routes.ts` | T-13 | ✅ |
 | FR-8 | Report generation | `reports.routes.ts` incl. CSV export | Manual | ✅ |
-| FR-9 | Cloud database integration | `db/pool.ts`, migrations | Suite runs on real PostgreSQL | 🟡 |
+| FR-9 | Cloud database integration | `db/pool.ts`, migrations, Render PostgreSQL | Suite runs on real PostgreSQL; live | ✅ |
 | FR-10 | Administrator module | `user-management/`, `administration/` | R-23 – R-26 | ✅ |
 
 ---
@@ -71,10 +73,10 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 
 | Requirement | Implementation | Status |
 |---|---|---|
-| Cloud-hosted database | Supabase PostgreSQL | ⬜ *(configured, not provisioned)* |
+| Cloud-hosted database | Render managed PostgreSQL 16 + pgvector | ✅ |
 | REST APIs | ~40 endpoints | ✅ |
 | Cloud storage where applicable | **Not implemented.** Attachments were scoped out; the schema anticipates them | ⬜ *(deliberate)* |
-| Public cloud deployment | Vercel + Render | ⬜ |
+| Public cloud deployment | Vercel + Render | ✅ |
 
 ---
 
@@ -107,21 +109,21 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 | Authentication | `modules/authentication/`, `middleware/auth.ts` | ✅ |
 | Core Modules | All five spec modules implemented | ✅ |
 | GitHub Repository | Public, with history | ✅ |
-| Initial Cloud Deployment | `DEPLOYMENT.md` written; **not executed** | ⬜ |
+| Initial Cloud Deployment | Live on Vercel + Render | ✅ |
 
 ### R3 / Final Demo — 15 October
 
 | Deliverable | Artefact | Status |
 |---|---|---|
 | Complete SaaS Application | Backend + frontend, verified running | ✅ |
-| Public Live URL | Pending deployment | ⬜ |
+| Public Live URL | https://servicedesk-ai-two.vercel.app | ✅ |
 | Responsive UI | Verified at 375 / 768 / 1280 | ✅ |
-| Cloud Database | Pending provisioning | ⬜ |
-| Testing | 153 automated tests, all passing; CI green; `TESTING.md` | ✅ |
-| Final Report | Cover page done; body assembles from these docs per the A2 22-section template | 🟡 |
-| PPT | R1 deck delivered; R3 deck to be built from it | 🟡 |
+| Cloud Database | Render managed PostgreSQL | ✅ |
+| Testing | 161 automated tests, all passing; CI green; `TESTING.md` | ✅ |
+| Final Report | `ServiceDesk_AI_Review2_Review3_Submission.docx` / `.pdf` (A2 22-section template) | ✅ |
+| PPT | `ServiceDesk_AI_Final_Demo.pptx` | ✅ |
 | GitHub Repository | Public, with history | ✅ |
-| Working Demonstration | `DEMO_SCRIPT.md` | 🟡 *(needs the live URL)* |
+| Working Demonstration | `DEMO_SCRIPT.md` against the live URL | ✅ |
 
 ### Final demonstration checklist (A2)
 
@@ -130,8 +132,8 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 | Registration/Login | ✅ |
 | Role-based Access | ✅ |
 | Core Workflow | ✅ |
-| Cloud Deployment | ⬜ |
-| Live URL | ⬜ |
+| Cloud Deployment | ✅ |
+| Live URL | ✅ |
 | GitHub Repository | ✅ |
 | Responsive Design | ✅ |
 | Q&A by both team members | 🟡 *(your preparation)* |
@@ -151,17 +153,14 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 | AI-5 | AI never messages a customer directly | Draft returned only; agent must post the message | AI-12 | ✅ |
 | AI-6 | Graceful degradation to a rule-based classifier | `fallback.provider.ts`, `attempt()` | AI-09, AI-11, AI-15 | ✅ |
 | AI-7 | Ticket creation never blocked by AI | `void classifyAndStore()` after commit | AI-11 | ✅ |
-| AI-8 | Key never reaches the browser | Backend-only provider; only `VITE_API_BASE_URL` is public | Verify step 11 in `DEPLOYMENT.md` | ✅ |
+| AI-8 | Key never reaches the browser | Backend-only provider; only `VITE_API_BASE_URL` is public | Vercel has exactly one env var | ✅ |
 
 ---
 
 ## 8. Outstanding work
 
-| # | Item | Blocker | Owner |
-|---|---|---|---|
-| 1 | Provision Supabase, deploy to Render and Vercel | Needs your accounts — cannot be done on your behalf | You |
-| 2 | Record the live URL in README, deck and this matrix | Depends on 1 | You |
-| 3 | Populate `screenshots/` from the deployed app | Depends on 1 | You |
-| 4 | Assemble the final report body (22-section A2 template) from these docs | — | You |
-| 5 | Build the R3 demonstration deck from the R1 deck | — | You |
-| 6 | Both members study `VIVA_PREPARATION.md` and the code it references | — | Both |
+| # | Item | Owner |
+|---|---|---|
+| 1 | Change the seeded admin password after the review | You |
+| 2 | Replace the temporary Meta access token with a permanent System User token | You |
+| 3 | Both members study `VIVA_PREPARATION.md` and `PROJECT_DEEP_DIVE.md` | Both |

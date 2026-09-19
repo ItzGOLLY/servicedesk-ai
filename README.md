@@ -14,7 +14,9 @@ Built for **BCSE408L – Cloud Computing**, School of Computer Science Engineeri
 | **SaaS Category** | Customer Support SaaS |
 | **Problem Statement** | Manage customer complaints and automate ticket handling |
 | **Target Users** | Customer · Support Agent · Admin |
-| **Live URL** | _Not yet deployed — see [Project Status](#project-status)_ |
+| **Live app** | https://servicedesk-ai-two.vercel.app |
+| **Live API** | https://servicedesk-api-ss2d.onrender.com/api |
+| **API docs (Swagger)** | https://servicedesk-api-ss2d.onrender.com/api/docs |
 
 ---
 
@@ -34,19 +36,25 @@ The table below reflects what is **actually built and verified**, not what is pl
 | Milestone | Date | Focus | Status |
 |---|---|---|---|
 | **R1** | 20 August | Requirements, SRS, use cases, UI mockups | Complete |
-| **R2** | 17 September | Architecture, database, REST APIs, auth, core modules | Complete except deployment |
-| **R3 / Final Demo** | 15 October | Complete application, testing, reports, live URL | Application and tests complete; deployment outstanding |
+| **R2** | 17 September | Architecture, database, REST APIs, auth, core modules | Complete |
+| **R3 / Final Demo** | 15 October | Complete application, testing, reports, live URL | Complete — deployed and verified live |
 
 **Verified by running it, not by assuming:**
 
 - Backend and frontend typecheck and build under strict TypeScript
 - **`docker compose up` brings up the whole stack** — pgvector Postgres, migrations, seed, API, frontend — verified working
-- **153 automated tests pass** against a real PostgreSQL using production migrations
+- **161 automated tests pass** against a real PostgreSQL using production migrations
 - **CI is green** on GitHub Actions: backend, frontend and Docker image builds
 - RAG verified end to end: articles chunked, embedded, retrieved by cosine similarity, answered with citations
 - AI metrics measured, not asserted — see [AI evaluation](#ai-evaluation)
 
-**Not deployed.** No hosting account has been provisioned, so **there is no live URL and none is claimed**. [`render.yaml`](render.yaml) is a complete Render Blueprint and [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) documents every step; deployment needs account access.
+**Deployed and verified live (19 September 2026):**
+
+- Frontend on **Vercel** — https://servicedesk-ai-two.vercel.app
+- API on **Render** (Singapore) from the [`render.yaml`](render.yaml) Blueprint — https://servicedesk-api-ss2d.onrender.com/api/health
+- **Managed PostgreSQL 16 + pgvector** on Render, provisioned by the same Blueprint
+- **WhatsApp two-way channel live** through Meta's WhatsApp Cloud API — a customer message raises a ticket and receives an automatic reply; agent replies from the web app are delivered back to the chat
+- Screenshots of the live application are in [`screenshots/`](screenshots/)
 
 ---
 
