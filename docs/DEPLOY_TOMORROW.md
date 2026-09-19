@@ -183,6 +183,18 @@ WhatsApp → **Configuration** → Webhook → **Edit**:
 **Verify and save.** Then on the same page → Webhook fields → **Manage** →
 subscribe to **`messages`**. Nothing else.
 
+**Then attach the app to the account — Meta's UI skips this.** The Quickstart
+subscribes Meta's own "Test the API" app to your WhatsApp Business Account,
+not yours, so nothing is delivered until you run (values from API Setup):
+
+```
+curl -X POST "https://graph.facebook.com/v22.0/<WHATSAPP_BUSINESS_ACCOUNT_ID>/subscribed_apps" \
+     -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
+`{"success":true}` means done. Check with the same URL as a GET — your app's
+name must appear in the list.
+
 ### 4e — Test
 
 From your verified phone, WhatsApp the **test number**:
