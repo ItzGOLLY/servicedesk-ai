@@ -14,6 +14,8 @@ const log = loggerFor('seed');
  * gives the AI classifier something meaningful to work on during a demo.
  */
 
+const TENANT = ['ServiceDesk Demo', 'demo'] as const;
+
 const CATEGORIES = [
   ['Billing', 'Payments, invoices, refunds and subscription charges'],
   ['Technical', 'Errors, crashes and unexpected application behaviour'],
@@ -70,11 +72,21 @@ const TICKETS: [string, string, string][] = [
 async function seed(): Promise<void> {
   log.info('starting');
 
+  // --- workspace ---
+  // Every other row references it, so it is created first. Idempotent like
+  // the rest of the seed.
+  await query(
+    `INSERT INTO tenants (name, slug, contact_email) VALUES ($1, $2, $3)
+     ON CONFLICT (slug) DO NOTHING`,
+    [TENANT[0], TENANT[1], env.seedAdminEmail]
+  );
+  log.info(`workspace ready (${TENANT[1]})`);
+
   // --- categories ---
   for (const [name, description] of CATEGORIES) {
     await query(
-      `INSERT INTO categories (name, description) VALUES ($1, $2)
-       ON CONFLICT (name) DO NOTHING`,
+      `INSERT INTO categories (tenant_id, name, description) VALUES ((SELECT id FROM tenants ORDER BY created_at LIMIT 1), $1, $2)
+       ON CONFLICT (tenant_id, name) DO NOTHING`,
       [name, description]
     );
   }
@@ -83,8 +95,8 @@ async function seed(): Promise<void> {
   // --- admin ---
   const adminHash = await hashPassword(env.seedAdminPassword);
   await query(
-    `INSERT INTO users (email, password_hash, full_name, role)
-     VALUES ($1, $2, 'System Administrator', 'ADMIN')
+    `INSERT INTO users (tenant_id, email, password_hash, full_name, role)
+     VALUES ((SELECT id FROM tenants ORDER BY created_at LIMIT 1), $1, $2, 'System Administrator', 'ADMIN')
      ON CONFLICT (email) DO NOTHING`,
     [env.seedAdminEmail, adminHash]
   );
@@ -93,8 +105,8 @@ async function seed(): Promise<void> {
   // --- agents ---
   for (const [fullName, email, password, role] of STAFF) {
     await query(
-      `INSERT INTO users (email, password_hash, full_name, role)
-       VALUES ($1, $2, $3, $4::user_role)
+      `INSERT INTO users (tenant_id, email, password_hash, full_name, role)
+       VALUES ((SELECT id FROM tenants ORDER BY created_at LIMIT 1), $1, $2, $3, $4::user_role)
        ON CONFLICT (email) DO NOTHING`,
       [email, await hashPassword(password), fullName, role]
     );
@@ -105,8 +117,8 @@ async function seed(): Promise<void> {
   const customerHash = await hashPassword('Customer@12345');
   for (const [fullName, email] of CUSTOMERS) {
     await query(
-      `INSERT INTO users (email, password_hash, full_name, role)
-       VALUES ($1, $2, $3, 'CUSTOMER')
+      `INSERT INTO users (tenant_id, email, password_hash, full_name, role)
+       VALUES ((SELECT id FROM tenants ORDER BY created_at LIMIT 1), $1, $2, $3, 'CUSTOMER')
        ON CONFLICT (email) DO NOTHING`,
       [email, customerHash, fullName]
     );
@@ -127,8 +139,8 @@ async function seed(): Promise<void> {
     if (!customer) continue;
 
     const ticket = await queryOne<{ id: string }>(
-      `INSERT INTO tickets (customer_id, subject, description, status)
-       VALUES ($1, $2, $3, 'NEW') RETURNING id`,
+      `INSERT INTO tickets (tenant_id, customer_id, subject, description, status)
+       VALUES ((SELECT id FROM tenants ORDER BY created_at LIMIT 1), $1, $2, $3, 'NEW') RETURNING id`,
       [customer.id, subject, description]
     );
     if (ticket) {

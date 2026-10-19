@@ -10,6 +10,7 @@ import {
   type TestUser,
 } from './helpers';
 import { closePool, query, queryOne } from '../src/db/pool';
+import { defaultTenantId } from './helpers';
 import { handleInbound } from '../src/modules/whatsapp/whatsapp.service';
 import { normaliseNumber } from '../src/services/whatsapp';
 import * as t from '../src/services/whatsapp/format';
@@ -18,6 +19,16 @@ import { env } from '../src/config/env';
 import crypto from 'node:crypto';
 
 const NUMBER = '+919000000001';
+
+/**
+ * The workspace the original single-tenant cases run in.
+ *
+ * handleInbound became tenant-scoped when the platform was introduced, so each
+ * case now states which business the message belongs to. Resolved per test
+ * because resetDatabase recreates the workspace with a new id.
+ */
+let ctx: { tenantId: string; slug: string };
+const tenantCtx = () => ctx;
 let counter = 0;
 const inbound = (body: string, from = NUMBER) => ({
   providerMessageId: `test-${(counter += 1)}`,
@@ -156,13 +167,14 @@ describe('WhatsApp inbound flow (integration)', () => {
 
   beforeEach(async () => {
     await resetDatabase();
+    ctx = { tenantId: await defaultTenantId(), slug: 'demo' };
     await createCategory('Billing');
     agent = await createUser('AGENT', 'priya@example.com', 'Priya Nair');
     admin = await createUser('ADMIN', 'admin@example.com', 'System Admin');
   });
 
   it('creates a customer account for a number it has not seen', async () => {
-    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator');
+    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator', tenantCtx());
 
     const user = await queryOne<{ role: string; whatsapp_number: string }>(
       'SELECT role, whatsapp_number FROM users WHERE whatsapp_number = $1',
@@ -172,10 +184,7 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('raises a ticket from a message, marked as the WhatsApp channel', async () => {
-    const outcome = await handleInbound(
-      inbound('My payment was deducted but the order is still pending.'),
-      'simulator'
-    );
+    const outcome = await handleInbound(inbound('My payment was deducted but the order is still pending.'), 'simulator', tenantCtx());
 
     expect(outcome.handled).toBe(true);
     expect(outcome.ticketReference).toMatch(/^SD-\d+$/);
@@ -189,10 +198,7 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('replies to the customer with a confirmation', async () => {
-    const outcome = await handleInbound(
-      inbound('The application crashes when I open checkout.'),
-      'simulator'
-    );
+    const outcome = await handleInbound(inbound('The application crashes when I open checkout.'), 'simulator', tenantCtx());
 
     const sent = await query<{ body: string; direction: string }>(
       `SELECT body, direction::TEXT FROM whatsapp_messages WHERE direction = 'OUTBOUND'`
@@ -204,8 +210,8 @@ describe('WhatsApp inbound flow (integration)', () => {
   it('ignores a replayed webhook instead of raising a second ticket', async () => {
     const message = inbound('My payment was deducted but the order is pending.');
 
-    const first = await handleInbound(message, 'simulator');
-    const second = await handleInbound(message, 'simulator');
+    const first = await handleInbound(message, 'simulator', tenantCtx());
+    const second = await handleInbound(message, 'simulator', tenantCtx());
 
     expect(first.handled).toBe(true);
     expect(second.handled).toBe(false);
@@ -216,8 +222,8 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('appends a follow-up message to the open ticket rather than creating another', async () => {
-    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator');
-    const second = await handleInbound(inbound('The order number is 4471.'), 'simulator');
+    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator', tenantCtx());
+    const second = await handleInbound(inbound('The order number is 4471.'), 'simulator', tenantCtx());
 
     expect(second.reason).toContain('appended');
 
@@ -233,8 +239,8 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('answers the STATUS keyword without creating a ticket', async () => {
-    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator');
-    const outcome = await handleInbound(inbound('STATUS'), 'simulator');
+    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator', tenantCtx());
+    const outcome = await handleInbound(inbound('STATUS'), 'simulator', tenantCtx());
 
     expect(outcome.reason).toBe('status');
     const tickets = await query('SELECT id FROM tickets');
@@ -242,7 +248,7 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('answers HELP with the command list', async () => {
-    const outcome = await handleInbound(inbound('HELP'), 'simulator');
+    const outcome = await handleInbound(inbound('HELP'), 'simulator', tenantCtx());
     expect(outcome.reason).toBe('help');
 
     const sent = await query<{ body: string }>(
@@ -253,7 +259,7 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('asks for more detail when the message is too short to be a ticket', async () => {
-    const outcome = await handleInbound(inbound('hi'), 'simulator');
+    const outcome = await handleInbound(inbound('hi'), 'simulator', tenantCtx());
     expect(outcome.reason).toContain('too short');
 
     const tickets = await query('SELECT id FROM tickets');
@@ -261,10 +267,7 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('lets the customer close a resolved ticket with CLOSE', async () => {
-    const created = await handleInbound(
-      inbound('My payment was deducted but the order is pending.'),
-      'simulator'
-    );
+    const created = await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator', tenantCtx());
     const ticket = await queryOne<{ id: string }>('SELECT id FROM tickets WHERE reference = $1', [
       created.ticketReference!,
     ]);
@@ -278,7 +281,7 @@ describe('WhatsApp inbound flow (integration)', () => {
       .set(auth(agent))
       .send({ status: 'RESOLVED' });
 
-    const outcome = await handleInbound(inbound('CLOSE'), 'simulator');
+    const outcome = await handleInbound(inbound('CLOSE'), 'simulator', tenantCtx());
     expect(outcome.reason).toBe('closed');
 
     const after = await queryOne<{ status: string }>(
@@ -289,11 +292,8 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('raises a separate ticket for NEW with a description, even with one open', async () => {
-    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator');
-    const outcome = await handleInbound(
-      inbound('NEW my replacement order has still not arrived'),
-      'simulator'
-    );
+    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator', tenantCtx());
+    const outcome = await handleInbound(inbound('NEW my replacement order has still not arrived'), 'simulator', tenantCtx());
 
     expect(outcome.reason).toBe('ticket created');
 
@@ -303,7 +303,7 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('asks for a description when NEW arrives on its own', async () => {
-    const outcome = await handleInbound(inbound('NEW'), 'simulator');
+    const outcome = await handleInbound(inbound('NEW'), 'simulator', tenantCtx());
 
     expect(outcome.reason).toContain('without a description');
     const tickets = await query('SELECT id FROM tickets');
@@ -316,18 +316,15 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('does not treat a word merely starting with "new" as the NEW command', async () => {
-    const outcome = await handleInbound(
-      inbound('Newsletter signup is broken on your website checkout page.'),
-      'simulator'
-    );
+    const outcome = await handleInbound(inbound('Newsletter signup is broken on your website checkout page.'), 'simulator', tenantCtx());
     expect(outcome.reason).toBe('ticket created');
   });
 
   it('explains why CLOSE was refused instead of implying a status change', async () => {
-    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator');
+    await handleInbound(inbound('My payment was deducted but the order is pending.'), 'simulator', tenantCtx());
 
     // The ticket is NEW, so a customer cannot close it.
-    const outcome = await handleInbound(inbound('CLOSE'), 'simulator');
+    const outcome = await handleInbound(inbound('CLOSE'), 'simulator', tenantCtx());
     expect(outcome.reason).toContain('close refused');
 
     const sent = await query<{ body: string }>(
@@ -338,7 +335,7 @@ describe('WhatsApp inbound flow (integration)', () => {
   });
 
   it('rejects a sender number that is not a phone number', async () => {
-    const outcome = await handleInbound(inbound('Hello there', 'not-a-number'), 'simulator');
+    const outcome = await handleInbound(inbound('Hello there', 'not-a-number'), 'simulator', tenantCtx());
     expect(outcome.handled).toBe(false);
     expect(outcome.reason).toContain('unrecognised');
   });
@@ -356,6 +353,7 @@ describe('WhatsApp outbound and admin console', () => {
 
   beforeEach(async () => {
     await resetDatabase();
+    ctx = { tenantId: await defaultTenantId(), slug: 'demo' };
     agent = await createUser('AGENT', 'priya@example.com', 'Priya Nair');
     admin = await createUser('ADMIN', 'admin@example.com', 'System Admin');
     customer = await createUser('CUSTOMER', 'rohan@example.com', 'Rohan Menon');
@@ -365,7 +363,8 @@ describe('WhatsApp outbound and admin console', () => {
   it('delivers an agent reply to the customer chat, converted to plain text', async () => {
     const created = await handleInbound(
       { providerMessageId: 'out-1', from: customerNumber, body: 'My refund has not arrived yet.' },
-      'simulator'
+      'simulator',
+      tenantCtx()
     );
     const ticket = await queryOne<{ id: string }>('SELECT id FROM tickets WHERE reference = $1', [
       created.ticketReference!,
@@ -405,7 +404,8 @@ describe('WhatsApp outbound and admin console', () => {
   it('notifies the customer on WhatsApp when the status changes', async () => {
     const created = await handleInbound(
       { providerMessageId: 'out-2', from: customerNumber, body: 'My refund has not arrived yet.' },
-      'simulator'
+      'simulator',
+      tenantCtx()
     );
     const ticket = await queryOne<{ id: string }>('SELECT id FROM tickets WHERE reference = $1', [
       created.ticketReference!,
@@ -463,7 +463,8 @@ describe('WhatsApp outbound and admin console', () => {
   it('masks customer numbers in the admin message log', async () => {
     await handleInbound(
       { providerMessageId: 'mask-1', from: customerNumber, body: 'My refund has not arrived yet.' },
-      'simulator'
+      'simulator',
+      tenantCtx()
     );
 
     const response = await request(app).get('/api/whatsapp/admin/messages').set(auth(admin));

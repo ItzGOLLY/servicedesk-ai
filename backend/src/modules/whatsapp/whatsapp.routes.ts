@@ -24,6 +24,24 @@ const log = loggerFor('whatsapp');
 export const whatsappRouter = Router();
 
 /**
+ * The tenant this deployment's own WhatsApp number belongs to.
+ *
+ * These routes predate the platform: they serve the single first-party number
+ * configured in the environment, not an onboarded customer account. That
+ * number belongs to the deployment's own workspace, which migration 006 named
+ * 'demo' and attributed all pre-existing data to. Platform tenants come
+ * through /api/webhooks/meta instead, where the tenant is resolved from the
+ * number the message arrived on.
+ */
+async function firstPartyTenant(): Promise<{ tenantId: string; slug: string }> {
+  const row = await queryOne<{ id: string; slug: string }>(
+    `SELECT id, slug FROM tenants ORDER BY created_at LIMIT 1`
+  );
+  if (!row) throw ApiError.notFound('No workspace exists in this deployment.');
+  return { tenantId: row.id, slug: row.slug };
+}
+
+/**
  * The webhook is a public endpoint — the provider calls it, not a signed-in
  * user — so it is rate limited and signature-verified rather than authenticated.
  */
@@ -59,7 +77,7 @@ whatsappRouter.post(
     try {
       const messages = parseWebhook(req.body);
       for (const message of messages) {
-        const outcome = await handleInbound(message, whatsappStatus.active);
+        const outcome = await handleInbound(message, whatsappStatus.active, await firstPartyTenant());
         if (outcome.handled) processed += 1;
         else log.warn({ reason: outcome.reason }, 'inbound WhatsApp message not handled');
       }
@@ -216,7 +234,8 @@ whatsappRouter.post(
         from: number,
         body,
       },
-      whatsappStatus.active
+      whatsappStatus.active,
+      await firstPartyTenant()
     );
 
     await recordAudit(req, 'WHATSAPP_SIMULATED', 'whatsapp', null, { from: number });

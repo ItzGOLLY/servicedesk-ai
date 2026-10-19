@@ -4,6 +4,7 @@ import { query, queryOne } from '../../db/pool';
 import { validate } from '../../middleware/validate';
 import { requireAuth } from '../../middleware/auth';
 import { ApiError } from '../../utils/ApiError';
+import { defaultTenant } from '../../services/platform/tenant.service';
 import { asyncHandler, created, ok } from '../../utils/http';
 import {
   hashPassword,
@@ -91,11 +92,17 @@ authRouter.post(
     }
 
     const passwordHash = await hashPassword(password);
+
+    // Self-registration joins this deployment's own workspace. Staff accounts
+    // for other tenants are created inside those tenants by their own admins,
+    // never by signing up here.
+    const { tenantId } = await defaultTenant();
+
     const user = await queryOne<UserRow>(
-      `INSERT INTO users (email, password_hash, full_name, phone, role)
-       VALUES ($1, $2, $3, $4, 'CUSTOMER')
+      `INSERT INTO users (tenant_id, email, password_hash, full_name, phone, role)
+       VALUES ($5, $1, $2, $3, $4, 'CUSTOMER')
        RETURNING id, email, full_name, role, phone, is_active, created_at`,
-      [email, passwordHash, fullName, phone || null]
+      [email, passwordHash, fullName, phone || null, tenantId]
     );
 
     if (!user) throw ApiError.internal('Could not create the account.');

@@ -6,6 +6,7 @@ import { TwilioWhatsAppProvider } from './twilio.provider';
 import { MetaWhatsAppProvider } from './meta.provider';
 import type { InboundMessage, WhatsAppProvider } from './types';
 import { loggerFor } from '../../observability/logger';
+import { defaultTenant } from '../platform/tenant.service';
 
 const log = loggerFor('whatsapp');
 
@@ -75,6 +76,12 @@ export interface SendOptions {
   ticketId?: string | null;
   messageId?: string | null;
   userId?: string | null;
+  /**
+   * The workspace the message belongs to. Omitted by callers that predate
+   * multi-tenancy, which all concern this deployment's own number, so it
+   * falls back to the default workspace.
+   */
+  tenantId?: string | null;
 }
 
 /**
@@ -93,13 +100,15 @@ export async function sendMessage(
   const number = normaliseNumber(to);
   if (!number) return { delivered: false, error: 'Not a valid WhatsApp number.' };
 
+  const tenantId = options.tenantId ?? (await defaultTenant()).tenantId;
+
   try {
     const result = await provider.send({ to: number, body });
 
     await query(
       `INSERT INTO whatsapp_messages
-         (direction, provider_message_id, wa_number, body, ticket_id, message_id, user_id, status, provider)
-       VALUES ('OUTBOUND', $1, $2, $3, $4, $5, $6, $7::wa_delivery_status, $8)`,
+         (tenant_id, direction, provider_message_id, wa_number, body, ticket_id, message_id, user_id, status, provider)
+       VALUES ($9, 'OUTBOUND', $1, $2, $3, $4, $5, $6, $7::wa_delivery_status, $8)`,
       [
         result.providerMessageId,
         number,
@@ -109,6 +118,7 @@ export async function sendMessage(
         options.userId ?? null,
         result.status,
         provider.name,
+        tenantId,
       ]
     );
 
@@ -121,8 +131,8 @@ export async function sendMessage(
     try {
       await query(
         `INSERT INTO whatsapp_messages
-           (direction, wa_number, body, ticket_id, message_id, user_id, status, error_detail, provider)
-         VALUES ('OUTBOUND', $1, $2, $3, $4, $5, 'FAILED', $6, $7)`,
+           (tenant_id, direction, wa_number, body, ticket_id, message_id, user_id, status, error_detail, provider)
+         VALUES ($8, 'OUTBOUND', $1, $2, $3, $4, $5, 'FAILED', $6, $7)`,
         [
           number,
           body,
@@ -131,6 +141,7 @@ export async function sendMessage(
           options.userId ?? null,
           detail.slice(0, 500),
           provider.name,
+          tenantId,
         ]
       );
     } catch (logError) {

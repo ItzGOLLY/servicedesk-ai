@@ -16,6 +16,8 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   role: UserRole;
+  /** The business this account belongs to. Every tenant-owned query is scoped by it. */
+  tenantId: string;
 }
 
 // Makes req.user available to every handler after the auth middleware has run.
@@ -24,6 +26,9 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthenticatedUser;
+      /** Set by requireApiKey for machine callers, which have no user. */
+      apiTenantId?: string;
+      apiKeyId?: string;
     }
   }
 }
