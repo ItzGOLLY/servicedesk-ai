@@ -3,15 +3,29 @@ import { hashPassword } from '../../utils/security';
 import { classifyAndStore, recordEvent } from '../tickets/tickets.service';
 import { notify } from '../../services/notifications';
 import { canTransition } from '../tickets/lifecycle';
-import { normaliseNumber, sendMessage, templates, type InboundMessage } from '../../services/whatsapp';
+import { normaliseNumber, templates, type InboundMessage } from '../../services/whatsapp';
+import { sendTenantMessage } from '../../services/platform/messaging.service';
 import type { TicketPriority, TicketStatus } from '../../types';
 
 /**
- * Inbound WhatsApp handling.
+ * Inbound WhatsApp handling for the built-in helpdesk app.
  *
  * A message from a phone number has no session and no password, so the number
  * itself is the identity. Everything here is driven by that one fact.
+ *
+ * Since the platform became multi-tenant this is no longer "the" inbound path
+ * — it is one app that a tenant may switch on. Every query is therefore scoped
+ * by tenant_id, and the same customer phone number reaching two different
+ * tenants produces two unrelated accounts, as it must: they are customers of
+ * different businesses.
  */
+
+/** Which business this message belongs to, resolved from the number it arrived on. */
+export interface TenantContext {
+  tenantId: string;
+  slug: string;
+  numberId?: string | null;
+}
 
 interface TicketRow {
   id: string;
@@ -42,51 +56,56 @@ const MIN_TICKET_LENGTH = 12;
  * discarded — so it cannot be signed into until the person sets one via the
  * normal flow. That avoids creating an account with a guessable credential.
  */
-async function findOrCreateCustomer(waNumber: string): Promise<{ id: string; full_name: string }> {
+async function findOrCreateCustomer(
+  tenant: TenantContext,
+  waNumber: string
+): Promise<{ id: string; full_name: string }> {
   const existing = await queryOne<{ id: string; full_name: string }>(
-    'SELECT id, full_name FROM users WHERE whatsapp_number = $1',
-    [waNumber]
+    'SELECT id, full_name FROM users WHERE tenant_id = $1 AND whatsapp_number = $2',
+    [tenant.tenantId, waNumber]
   );
   if (existing) return existing;
 
   // A placeholder email keeps the NOT NULL/UNIQUE contract on users.email
-  // without inventing an address that might belong to someone else.
-  const placeholderEmail = `wa${waNumber.replace(/\D/g, '')}@whatsapp.local`;
+  // without inventing an address that might belong to someone else. The tenant
+  // slug is part of it because users.email is unique platform-wide: the same
+  // person contacting two businesses must not collide into one account.
+  const placeholderEmail = `wa${waNumber.replace(/\D/g, '')}.${tenant.slug}@whatsapp.local`;
   const unusablePassword = await hashPassword(
     `${waNumber}:${Date.now()}:${Math.round(Number.MAX_SAFE_INTEGER * 0.5)}`
   );
 
   const created = await queryOne<{ id: string; full_name: string }>(
-    `INSERT INTO users (email, password_hash, full_name, role, phone, whatsapp_number)
-     VALUES ($1, $2, $3, 'CUSTOMER', $4, $4)
+    `INSERT INTO users (tenant_id, email, password_hash, full_name, role, phone, whatsapp_number)
+     VALUES ($5, $1, $2, $3, 'CUSTOMER', $4, $4)
      ON CONFLICT (email) DO UPDATE SET whatsapp_number = EXCLUDED.whatsapp_number
      RETURNING id, full_name`,
-    [placeholderEmail, unusablePassword, `WhatsApp ${waNumber.slice(-4)}`, waNumber]
+    [placeholderEmail, unusablePassword, `WhatsApp ${waNumber.slice(-4)}`, waNumber, tenant.tenantId]
   );
 
   return created!;
 }
 
 /** The most recent ticket this customer could still be talking about. */
-async function mostRecentOpenTicket(customerId: string): Promise<TicketRow | null> {
+async function mostRecentOpenTicket(tenantId: string, customerId: string): Promise<TicketRow | null> {
   return queryOne<TicketRow>(
     `SELECT t.id, t.reference, t.subject, t.status, t.priority, c.name AS category
        FROM tickets t LEFT JOIN categories c ON c.id = t.category_id
-      WHERE t.customer_id = $1 AND t.status <> 'CLOSED'
+      WHERE t.tenant_id = $2 AND t.customer_id = $1 AND t.status <> 'CLOSED'
       ORDER BY t.updated_at DESC
       LIMIT 1`,
-    [customerId]
+    [customerId, tenantId]
   );
 }
 
-async function openTickets(customerId: string): Promise<TicketRow[]> {
+async function openTickets(tenantId: string, customerId: string): Promise<TicketRow[]> {
   return query<TicketRow>(
     `SELECT t.id, t.reference, t.subject, t.status, t.priority, c.name AS category
        FROM tickets t LEFT JOIN categories c ON c.id = t.category_id
-      WHERE t.customer_id = $1 AND t.status <> 'CLOSED'
+      WHERE t.tenant_id = $2 AND t.customer_id = $1 AND t.status <> 'CLOSED'
       ORDER BY t.created_at DESC
       LIMIT 10`,
-    [customerId]
+    [customerId, tenantId]
   );
 }
 
@@ -106,12 +125,16 @@ function greetingName(fullName: string): string {
   return fullName.startsWith('WhatsApp ') ? 'there' : fullName.split(' ')[0] || 'there';
 }
 
-async function createTicketFrom(customerId: string, body: string): Promise<TicketRow> {
+async function createTicketFrom(
+  tenant: TenantContext,
+  customerId: string,
+  body: string
+): Promise<TicketRow> {
   const ticket = await queryOne<TicketRow>(
-    `INSERT INTO tickets (customer_id, subject, description, status, channel)
-     VALUES ($1, $2, $3, 'NEW', 'WHATSAPP')
+    `INSERT INTO tickets (tenant_id, customer_id, subject, description, status, channel)
+     VALUES ($4, $1, $2, $3, 'NEW', 'WHATSAPP')
      RETURNING id, reference, subject, status, priority, NULL::TEXT AS category`,
-    [customerId, deriveSubject(body), body]
+    [customerId, deriveSubject(body), body, tenant.tenantId]
   );
 
   await recordEvent(ticket!.id, customerId, 'CREATED', null, 'NEW');
@@ -140,7 +163,8 @@ export interface InboundOutcome {
  */
 export async function handleInbound(
   inbound: InboundMessage,
-  providerName: string
+  providerName: string,
+  tenant: TenantContext
 ): Promise<InboundOutcome> {
   const waNumber = normaliseNumber(inbound.from);
   if (!waNumber) return { handled: false, reason: 'unrecognised sender number' };
@@ -150,21 +174,26 @@ export async function handleInbound(
 
   // Idempotency gate.
   const recorded = await queryOne<{ id: string }>(
-    `INSERT INTO whatsapp_messages (direction, provider_message_id, wa_number, body, status, provider)
-     VALUES ('INBOUND', $1, $2, $3, 'DELIVERED', $4)
-     ON CONFLICT (provider_message_id) DO NOTHING
+    `INSERT INTO whatsapp_messages
+       (tenant_id, number_id, direction, provider_message_id, wa_number, body, status, provider)
+     VALUES ($5, $6, 'INBOUND', $1, $2, $3, 'DELIVERED', $4)
+     ON CONFLICT (tenant_id, provider_message_id) DO NOTHING
      RETURNING id`,
-    [inbound.providerMessageId, waNumber, body, providerName]
+    [inbound.providerMessageId, waNumber, body, providerName, tenant.tenantId, tenant.numberId ?? null]
   );
   if (!recorded) return { handled: false, reason: 'duplicate webhook delivery' };
 
-  const customer = await findOrCreateCustomer(waNumber);
+  const customer = await findOrCreateCustomer(tenant, waNumber);
   const keyword = body.toUpperCase().replace(/[^A-Z]/g, '');
 
   await query('UPDATE whatsapp_messages SET user_id = $1 WHERE id = $2', [customer.id, recorded.id]);
 
   const reply = async (text: string, ticketId: string | null = null) => {
-    await sendMessage(waNumber, text, { ticketId, userId: customer.id });
+    await sendTenantMessage(tenant.tenantId, waNumber, text, {
+      numberId: tenant.numberId,
+      ticketId,
+      userId: customer.id,
+    });
   };
 
   // --- keywords ------------------------------------------------------------
@@ -175,13 +204,13 @@ export async function handleInbound(
   }
 
   if (keyword === 'STATUS') {
-    const tickets = await openTickets(customer.id);
+    const tickets = await openTickets(tenant.tenantId, customer.id);
     await reply(templates.statusSummary(tickets.map(summaryOf)));
     return { handled: true, reason: 'status' };
   }
 
   if (keyword === 'CLOSE') {
-    const latest = await mostRecentOpenTicket(customer.id);
+    const latest = await mostRecentOpenTicket(tenant.tenantId, customer.id);
     if (!latest) {
       await reply(templates.statusSummary([]));
       return { handled: true, reason: 'close with no open ticket' };
@@ -194,7 +223,10 @@ export async function handleInbound(
       return { handled: true, reason: `close refused: ${check.reason}` };
     }
 
-    await query(`UPDATE tickets SET status = 'CLOSED', closed_at = NOW() WHERE id = $1`, [latest.id]);
+    await query(
+      `UPDATE tickets SET status = 'CLOSED', closed_at = NOW() WHERE id = $1 AND tenant_id = $2`,
+      [latest.id, tenant.tenantId]
+    );
     await recordEvent(latest.id, customer.id, 'STATUS_CHANGED', latest.status, 'CLOSED');
     await reply(templates.ticketClosed(summaryOf(latest)), latest.id);
     return { handled: true, reason: 'closed', ticketReference: latest.reference };
@@ -212,7 +244,7 @@ export async function handleInbound(
       return { handled: true, reason: 'new requested without a description' };
     }
 
-    const ticket = await createTicketFrom(customer.id, description);
+    const ticket = await createTicketFrom(tenant, customer.id, description);
     await query('UPDATE whatsapp_messages SET ticket_id = $1 WHERE id = $2', [
       ticket.id,
       recorded.id,
@@ -226,7 +258,7 @@ export async function handleInbound(
 
   // --- a message that is not a keyword -------------------------------------
 
-  const latest = await mostRecentOpenTicket(customer.id);
+  const latest = await mostRecentOpenTicket(tenant.tenantId, customer.id);
 
   // An existing open conversation receives the message as a reply, rather than
   // spawning a second ticket about the same problem.
@@ -276,7 +308,7 @@ export async function handleInbound(
     return { handled: true, reason: 'too short for a ticket' };
   }
 
-  const ticket = await createTicketFrom(customer.id, content);
+  const ticket = await createTicketFrom(tenant, customer.id, content);
 
   await query('UPDATE whatsapp_messages SET ticket_id = $1 WHERE id = $2', [ticket.id, recorded.id]);
   await reply(templates.ticketCreated(summaryOf(ticket), greetingName(customer.full_name)), ticket.id);

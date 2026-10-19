@@ -50,10 +50,10 @@ ticketsRouter.post(
     const { subject, description, categoryId, priority } = req.body;
 
     const ticket = await queryOne<{ id: string; reference: string }>(
-      `INSERT INTO tickets (customer_id, subject, description, category_id, priority, status)
-       VALUES ($1, $2, $3, $4, COALESCE($5::ticket_priority, 'MEDIUM'), 'NEW')
+      `INSERT INTO tickets (tenant_id, customer_id, subject, description, category_id, priority, status)
+       VALUES ($6, $1, $2, $3, $4, COALESCE($5::ticket_priority, 'MEDIUM'), 'NEW')
        RETURNING id, reference`,
-      [req.user!.id, subject, description, categoryId ?? null, priority ?? null]
+      [req.user!.id, subject, description, categoryId ?? null, priority ?? null, req.user!.tenantId]
     );
 
     if (!ticket) throw ApiError.internal('Could not create the ticket.');

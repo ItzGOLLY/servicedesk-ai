@@ -16,6 +16,10 @@ import { reportsRouter } from './modules/reports/reports.routes';
 import { aiRouter } from './modules/ai/ai.routes';
 import { whatsappRouter } from './modules/whatsapp/whatsapp.routes';
 import { knowledgeRouter } from './modules/knowledge/knowledge.routes';
+import { platformWebhookRouter } from './modules/platform/webhook.routes';
+import { platformConsoleRouter } from './modules/platform/console.routes';
+import { publicApiRouter } from './modules/platform/publicApi.routes';
+import { templatesRouter } from './modules/platform/templates.routes';
 import { pool } from './db/pool';
 import { httpLogger } from './observability/httpLogger';
 import { loggerFor } from './observability/logger';
@@ -126,6 +130,17 @@ export function createApp(): Express {
   app.use('/api/knowledge', knowledgeRouter);
   app.use('/api/whatsapp', whatsappRouter);
   app.use('/api/audit-logs', auditRouter);
+
+  // --- platform ------------------------------------------------------------
+  // One inbound webhook for every onboarded business; the tenant is resolved
+  // from the number the message arrived on.
+  app.use('/api/webhooks', platformWebhookRouter);
+  // The console a business configures its own integration in.
+  app.use('/api/platform', platformConsoleRouter);
+  app.use('/api/templates', templatesRouter);
+  // The versioned contract a tenant's own software calls, authenticated by
+  // API key rather than by session.
+  app.use('/v1', publicApiRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

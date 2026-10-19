@@ -4,7 +4,9 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../src/app';
 import { pool, query } from '../src/db/pool';
+import { encryptSecret } from '../src/utils/crypto';
 import { hashPassword } from '../src/utils/security';
+import { resetTenantCache } from '../src/services/platform/tenant.service';
 import type { UserRole } from '../src/types';
 
 export const app: Express = createApp();
@@ -27,11 +29,63 @@ export async function resetDatabase(): Promise<void> {
   await pool.query(`
     TRUNCATE TABLE
       kb_retrievals, kb_chunks, kb_articles,
-      whatsapp_messages, ai_suggestions, ticket_events, ticket_messages,
-      notifications, audit_logs, tickets, categories, users
+      usage_events, webhook_deliveries, webhook_endpoints, api_keys,
+      broadcast_recipients, broadcasts, message_templates, contacts,
+      whatsapp_messages, wa_numbers, wa_connections,
+      ai_suggestions, ticket_events, ticket_messages,
+      notifications, audit_logs, tickets, categories, users, tenants
     RESTART IDENTITY CASCADE
   `);
   await pool.query('ALTER SEQUENCE ticket_reference_seq RESTART WITH 1000');
+
+  // Truncating tenants removes the one migration 006 seeded, so the default
+  // workspace is recreated. Without it, registration and the first-party
+  // WhatsApp path would have no tenant to attach rows to.
+  await pool.query(
+    `INSERT INTO tenants (name, slug) VALUES ('Test Workspace', 'demo')
+     ON CONFLICT (slug) DO NOTHING`
+  );
+  resetTenantCache();
+}
+
+/** The workspace every helper creates data in unless told otherwise. */
+export async function defaultTenantId(): Promise<string> {
+  const rows = await query<{ id: string }>('SELECT id FROM tenants ORDER BY created_at LIMIT 1');
+  return rows[0].id;
+}
+
+/** A second business, for proving that one tenant cannot see another's data. */
+export async function createTenant(name: string, slug: string): Promise<string> {
+  const rows = await query<{ id: string }>(
+    'INSERT INTO tenants (name, slug) VALUES ($1, $2) RETURNING id',
+    [name, slug]
+  );
+  return rows[0].id;
+}
+
+/** Registers a connected WhatsApp number so inbound routing has a target. */
+export async function createConnectedNumber(
+  tenantId: string,
+  phoneNumberId: string,
+  displayNumber = '+15550001111'
+): Promise<{ connectionId: string; numberId: string }> {
+  const connection = await query<{ id: string }>(
+    `INSERT INTO wa_connections
+       (tenant_id, waba_id, access_token_encrypted, token_fingerprint, status, subscribed_at)
+     VALUES ($1, $2, $3, 'testfingerprint', 'ACTIVE', NOW())
+     RETURNING id`,
+    [tenantId, `waba-${phoneNumberId}`, encryptSecret(`token-for-${phoneNumberId}`)]
+  );
+
+  const number = await query<{ id: string }>(
+    `INSERT INTO wa_numbers
+       (tenant_id, connection_id, phone_number_id, display_number, registered, is_default)
+     VALUES ($1, $2, $3, $4, TRUE, TRUE)
+     RETURNING id`,
+    [tenantId, connection[0].id, phoneNumberId, displayNumber]
+  );
+
+  return { connectionId: connection[0].id, numberId: number[0].id };
 }
 
 export interface TestUser {
@@ -47,12 +101,15 @@ export async function createUser(
   role: UserRole,
   email: string,
   fullName = 'Test User',
-  password = 'Password123'
+  password = 'Password123',
+  tenantId?: string
 ): Promise<TestUser> {
+  const tenant = tenantId ?? (await defaultTenantId());
+
   const rows = await query<{ id: string }>(
-    `INSERT INTO users (email, password_hash, full_name, role)
-     VALUES ($1, $2, $3, $4::user_role) RETURNING id`,
-    [email, await hashPassword(password), fullName, role]
+    `INSERT INTO users (tenant_id, email, password_hash, full_name, role)
+     VALUES ($5, $1, $2, $3, $4::user_role) RETURNING id`,
+    [email, await hashPassword(password), fullName, role, tenant]
   );
 
   const login = await request(app).post('/api/auth/login').send({ email, password });
@@ -66,10 +123,11 @@ export async function createUser(
   };
 }
 
-export async function createCategory(name = 'Billing'): Promise<string> {
+export async function createCategory(name = 'Billing', tenantId?: string): Promise<string> {
+  const tenant = tenantId ?? (await defaultTenantId());
   const rows = await query<{ id: string }>(
-    'INSERT INTO categories (name) VALUES ($1) RETURNING id',
-    [name]
+    'INSERT INTO categories (tenant_id, name) VALUES ($2, $1) RETURNING id',
+    [name, tenant]
   );
   return rows[0].id;
 }

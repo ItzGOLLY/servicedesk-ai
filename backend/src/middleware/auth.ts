@@ -30,15 +30,18 @@ export async function requireAuth(
       throw ApiError.unauthorized('Your session has expired. Please sign in again.');
     }
 
-    const user = await queryOne<{ id: string; email: string; role: UserRole; is_active: boolean }>(
-      'SELECT id, email, role, is_active FROM users WHERE id = $1',
-      [payload.sub]
-    );
+    const user = await queryOne<{
+      id: string;
+      email: string;
+      role: UserRole;
+      is_active: boolean;
+      tenant_id: string;
+    }>('SELECT id, email, role, is_active, tenant_id FROM users WHERE id = $1', [payload.sub]);
 
     if (!user) throw ApiError.unauthorized('Account no longer exists.');
     if (!user.is_active) throw ApiError.forbidden('This account has been deactivated.');
 
-    req.user = { id: user.id, email: user.email, role: user.role };
+    req.user = { id: user.id, email: user.email, role: user.role, tenantId: user.tenant_id };
     next();
   } catch (error) {
     next(error);

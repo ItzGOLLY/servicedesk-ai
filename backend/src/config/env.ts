@@ -82,6 +82,24 @@ export const env = {
   whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN ?? '',
   whatsappGraphVersion: optional('WHATSAPP_GRAPH_VERSION', 'v22.0'),
 
+  // --- Tech Provider platform ---------------------------------------------
+  // Our own Meta app. These identify the PLATFORM, not any one tenant: the
+  // same app id and secret exchange every customer's Embedded Signup code and
+  // verify every customer's webhook delivery.
+  metaAppId: process.env.META_APP_ID ?? '',
+  metaAppSecret: process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET ?? '',
+  // The Facebook Login for Business configuration that defines which assets and
+  // permissions the Embedded Signup dialog asks the customer for.
+  metaEmbeddedSignupConfigId: process.env.META_ES_CONFIG_ID ?? '',
+  metaGraphVersion: optional('META_GRAPH_VERSION', 'v22.0'),
+  metaTimeoutMs: Number(optional('META_TIMEOUT_MS', '15000')),
+  // Two-step-verification PIN set when registering a customer's number.
+  metaRegistrationPin: optional('META_REGISTRATION_PIN', '000000'),
+  // Encrypts tenant access tokens at rest. Required in production.
+  platformEncryptionKey: process.env.PLATFORM_ENCRYPTION_KEY ?? '',
+  // Public base URL of this API, used to show tenants their webhook address.
+  platformPublicUrl: optional('PLATFORM_PUBLIC_URL', 'http://localhost:4000'),
+
   // Embeddings for knowledge-base retrieval.
   // 'deterministic' computes lexical vectors locally with no network or key;
   // 'openai' calls an OpenAI-compatible embeddings endpoint.

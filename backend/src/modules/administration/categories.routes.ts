@@ -63,13 +63,16 @@ categoriesRouter.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { name, description } = req.body;
 
-    const existing = await queryOne('SELECT id FROM categories WHERE LOWER(name) = LOWER($1)', [name]);
+    const existing = await queryOne(
+      'SELECT id FROM categories WHERE tenant_id = $2 AND LOWER(name) = LOWER($1)',
+      [name, req.user!.tenantId]
+    );
     if (existing) throw ApiError.conflict('A category with that name already exists.');
 
     const row = await queryOne<CategoryRow>(
-      `INSERT INTO categories (name, description) VALUES ($1, $2)
+      `INSERT INTO categories (tenant_id, name, description) VALUES ($3, $1, $2)
        RETURNING id, name, description, is_active, created_at`,
-      [name, description ?? null]
+      [name, description ?? null, req.user!.tenantId]
     );
 
     await recordAudit(req, 'CATEGORY_CREATED', 'category', row!.id, { name });

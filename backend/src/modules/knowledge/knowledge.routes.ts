@@ -96,11 +96,11 @@ knowledgeRouter.post(
     const { title, body, categoryId, isPublished } = req.body;
 
     const article = await queryOne<ArticleRow>(
-      `INSERT INTO kb_articles (title, body, category_id, is_published, author_id)
-       VALUES ($1, $2, $3, COALESCE($4, TRUE), $5)
+      `INSERT INTO kb_articles (tenant_id, title, body, category_id, is_published, author_id)
+       VALUES ($6, $1, $2, $3, COALESCE($4, TRUE), $5)
        RETURNING id, title, body, is_published, category_id, NULL::TEXT AS category_name,
                  created_at, updated_at`,
-      [title, body, categoryId ?? null, isPublished ?? null, req.user!.id]
+      [title, body, categoryId ?? null, isPublished ?? null, req.user!.id, req.user!.tenantId]
     );
 
     // Indexing is awaited here, unlike ticket classification: an article that
