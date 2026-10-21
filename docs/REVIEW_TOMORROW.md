@@ -4,10 +4,47 @@ Everything in order, with timings. Read §1 tonight, §3 is what you actually do
 
 ---
 
-## 1. Tonight — three tasks, ~40 minutes
+## 1. Tonight — four tasks
 
-Do them in this order. Stop after task 1 if you run out of time: the demo still
-works without 2 and 3, you just explain more and click less.
+Do them in this order. **Task 0 is mandatory** — the live API is currently
+down. Tasks 2 and 3 are optional polish.
+
+### Task 0 — Restore the live API (~20 min) · **DO THIS FIRST**
+
+**The Render database is gone.** Render's free PostgreSQL expires after 30
+days; yours was created on 16 September, which is 35 days ago. The port still
+answers and TLS still negotiates, but every PostgreSQL session is refused — and
+because the API runs `npm run migrate` before it starts, it cannot boot at all.
+This is unrelated to the platform code; the same thing would have happened
+without any changes.
+
+1. **Render dashboard** → check `servicedesk-db`. It will show as expired or
+   suspended.
+2. **New + → PostgreSQL** → name `servicedesk-db-2`, region **Singapore**,
+   plan **Free** → Create. (Same region as the API, or the internal connection
+   string will not resolve.)
+3. Open the new database → **Connect** → copy the **Internal Database URL**.
+4. `servicedesk-api` → **Environment** → set `DATABASE_URL` to that internal
+   URL → **Save**. Render redeploys and migrations run automatically on start.
+5. Wait for **Live**, then check:
+   `https://servicedesk-api-ss2d.onrender.com/api/health` → must say
+   `"database":"connected"`.
+6. **Seed the demo data.** Copy the new database's **External Database URL**,
+   then from the repo:
+
+   ```bash
+   cd backend
+   DATABASE_URL='<external url>' DATABASE_SSL=true \
+   JWT_ACCESS_SECRET=x JWT_REFRESH_SECRET=x npm run seed
+   ```
+
+**Your old tickets are gone** (SD-1006, SD-1007 and the WhatsApp history). The
+seed recreates a full demo set, so the demo is unaffected — just do not promise
+the panel you will show data from September.
+
+> **Note for the future:** a free Render database expires every 30 days. Put a
+> reminder in your calendar, or move to a paid instance before the final
+> submission.
 
 ### Task 1 — Prove the live site works (10 min) · **ESSENTIAL**
 
@@ -157,7 +194,8 @@ true.
 | "Connect with Facebook" greyed out | Meta vars not set — the page says so honestly; present it as the configuration step and move on |
 | Meta dialog errors | Domain not in Allowed Domains, or not HTTPS. Skip to the isolation demo (step 0:08) — it needs no Meta |
 | WhatsApp reply doesn't arrive | Token expired. Use admin → Message log → **Send a test message** instead |
-| Everything is down | `cd backend && npm run dev`, `cd frontend && npm run dev`, demo on localhost — and say so openly |
+| API health says database not connected | The free database expired again — Task 0 |
+| Everything is down | `cd backend && npm run dev`, `cd frontend && npm run dev`, demo on localhost — and say so openly. Everything except the live-URL claim still works |
 
 **Rollback**, only if the live site is broken and you cannot fix it:
 Render → `servicedesk-api` → Deploys → find the deploy for commit `3782540`
