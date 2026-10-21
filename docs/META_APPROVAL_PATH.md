@@ -12,17 +12,34 @@ Checked 19–21 October 2026.
 
 ## 1. The honest headline
 
-**This project does not hold Tech Provider approval, and cannot realistically
-obtain it.**
+**The integration works today without approval. What approval unlocks is who
+may use it.**
 
-Approval requires Meta to verify a *real registered business* — legal name,
-registered address, a phone number Meta calls, a matching website, and
-supporting documents if the business is not already on record. A student
-project has no such entity.
+Meta's App Review page states that Business-type apps *"are automatically
+approved for Standard Access for all Permissions and Features available to the
+Business app type, so you can test your app while you are in this access
+level."* Any person holding an **admin, developer or tester** role on the app
+can therefore complete the full Embedded Signup flow and onboard their own
+WhatsApp Business Account right now.
 
-What the project *has* done is build the integration to the standard Meta
-requires, so that everything except the commercial verification is in place.
-That distinction is stated wherever this work is presented.
+**Advanced Access — granted by App Review — is what lets businesses with no
+role on the app onboard.** Without it, calls against accounts the app does not
+own return error code `200`.
+
+App Review itself is free and averages ~24 hours. Its real prerequisite is
+**business verification**: the Tech Provider guide states *"Your business must
+be verified before you can start the app review process."* That needs a
+registered legal entity with an address, a contactable phone and documents —
+achievable (in India, a sole proprietorship with a free Udyam/MSME registration
+is a common route) but a company-registration task with real obligations, not
+an engineering one.
+
+Note also Meta's exemption: *"a Direct Developer using the API for their own
+business doesn't need Advanced Access or App Review."* The original
+single-tenant helpdesk is exactly that case.
+
+See `META_INTEGRATION_HANDBOOK.md` for the full procedure and the
+requirement-by-requirement readiness evidence.
 
 ---
 
@@ -34,7 +51,7 @@ Order matters: **business verification must complete before App Review opens.**
 |---|---|---|---|
 | 1 | Create a Meta app with the WhatsApp use case, attached to a business portfolio | App Dashboard | ✅ Done — app `ServiceDesk AI` |
 | 2 | Open **Use cases → Customize → WhatsApp → Tech Provider onboarding** | App Dashboard | ✅ Reachable |
-| 3 | **Verify the business**: name, address, phone, email, website, plus documents | Business Manager | ❌ **Blocked — no registered business** |
+| 3 | **Verify the business**: name, address, phone, email, website, plus documents | Business Manager | ⚠️ Needs a registered entity — the only real gate |
 | 4 | App settings: icon, privacy policy URL, category | App Dashboard | ✅ Can be completed |
 | 5 | Record two demonstration videos (below) | — | ✅ Recordable against test assets |
 | 6 | Request **Advanced access** to `whatsapp_business_messaging` and `whatsapp_business_management` | App Review | ❌ Depends on step 3 |

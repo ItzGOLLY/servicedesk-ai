@@ -218,13 +218,12 @@ platform. The ones that matter commercially:
 
 Stated plainly, because they will be asked about.
 
-- **Meta Tech Provider approval is not held.** Approval requires verifying a
-  real registered business (documents, address, contactable phone). The
-  integration meets Meta's technical requirements; the commercial status is a
-  separate matter. See `META_APPROVAL_PATH.md`.
-- **Without Advanced access**, the permissions do not appear in the Embedded
-  Signup dialog, so only app admins/developers/testers can complete it. That is
-  enough to demonstrate the flow, not to onboard the public.
+- **Meta Tech Provider approval is not held.** Business-type apps get Standard
+  Access automatically, so the full flow works today for anyone holding an
+  admin, developer or tester role on the app — enough to demonstrate real
+  third-party onboarding. Advanced Access, which App Review grants, is what
+  lets the general public onboard; its prerequisite is verifying a registered
+  business. See `META_INTEGRATION_HANDBOOK.md`.
 - **Webhook delivery runs in-process.** Durable, retried and safe across
   replicas via `FOR UPDATE SKIP LOCKED`, but a dedicated queue would be the
   next step at real volume.

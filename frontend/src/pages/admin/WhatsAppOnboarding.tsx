@@ -45,6 +45,7 @@ interface TenantNumber {
 interface SignupResult {
   phone_number_id: string;
   waba_id: string;
+  business_id: string | null;
 }
 
 declare global {
@@ -170,20 +171,53 @@ export default function WhatsAppOnboarding() {
         const payload = JSON.parse(event.data as string) as {
           type?: string;
           event?: string;
-          data?: { phone_number_id?: string; waba_id?: string };
+          data?: {
+            phone_number_id?: string;
+            waba_id?: string;
+            business_id?: string;
+            current_step?: string;
+            error_message?: string;
+          };
         };
 
         if (payload.type !== 'WA_EMBEDDED_SIGNUP') return;
 
-        if (payload.event === 'FINISH' || payload.event === 'FINISH_ONLY_WABA') {
+        // Meta reports success under several names depending on how the
+        // customer onboarded — Cloud API, an existing WhatsApp Business app
+        // number, an on-behalf-of migration, or API access only.
+        const SUCCESS = [
+          'FINISH',
+          'FINISH_ONLY_WABA',
+          'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+          'FINISH_OBO_MIGRATION',
+          'FINISH_GRANT_ONLY_API_ACCESS',
+        ];
+
+        if (payload.event && SUCCESS.includes(payload.event)) {
           if (payload.data?.waba_id && payload.data?.phone_number_id) {
             signupResult.current = {
               waba_id: payload.data.waba_id,
               phone_number_id: payload.data.phone_number_id,
+              business_id: payload.data.business_id ?? null,
             };
+          } else if (payload.data?.waba_id) {
+            // FINISH_ONLY_WABA: an account with no number yet. Saying so beats
+            // a silent failure when the code arrives without one.
+            setFailure(
+              'The account was authorised but has no phone number yet. Add one in WhatsApp Manager, then connect again.'
+            );
+            setLaunching(false);
           }
         } else if (payload.event === 'CANCEL') {
-          setFailure('Onboarding was cancelled before it finished.');
+          const reason = payload.data?.error_message
+            ? `Meta reported: ${payload.data.error_message}`
+            : payload.data?.current_step
+              ? `Cancelled at the "${payload.data.current_step}" step.`
+              : 'Onboarding was cancelled before it finished.';
+          setFailure(reason);
+          setLaunching(false);
+        } else if (payload.event === 'ERROR') {
+          setFailure(payload.data?.error_message ?? 'Meta reported an error during onboarding.');
           setLaunching(false);
         }
       } catch {
@@ -220,6 +254,8 @@ export default function WhatsAppOnboarding() {
           return;
         }
 
+        // Meta's code expires 30 seconds after it is issued, so this is sent
+        // immediately rather than after any confirmation step.
         complete.mutate(
           { code, waba_id: result.waba_id, phone_number_id: result.phone_number_id },
           { onSettled: () => setLaunching(false) }
@@ -230,7 +266,9 @@ export default function WhatsAppOnboarding() {
         // Returns a code to exchange server-side rather than a browser token.
         response_type: 'code',
         override_default_response_type: true,
-        extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
+        // v4 takes `setup` alone. featureType and sessionInfoVersion belonged
+        // to v2/v3, which Meta retired on 15 October 2026.
+        extras: { setup: {} },
       }
     );
   };
