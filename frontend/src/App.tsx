@@ -16,6 +16,8 @@ import CategoryManagement from './pages/admin/CategoryManagement';
 import Reports from './pages/admin/Reports';
 import ActivityLog from './pages/admin/ActivityLog';
 import WhatsAppConsole from './pages/admin/WhatsAppConsole';
+import WhatsAppOnboarding from './pages/admin/WhatsAppOnboarding';
+import Developer from './pages/admin/Developer';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import type { UserRole } from './lib/types';
@@ -141,6 +143,8 @@ export default function App() {
           <Route path="/admin/users" element={<UserManagement />} />
           <Route path="/admin/categories" element={<CategoryManagement />} />
           <Route path="/admin/whatsapp" element={<WhatsAppConsole />} />
+          <Route path="/admin/connect" element={<WhatsAppOnboarding />} />
+          <Route path="/admin/developers" element={<Developer />} />
           <Route path="/admin/reports" element={<Reports />} />
           <Route path="/admin/activity" element={<ActivityLog />} />
         </Route>
