@@ -116,3 +116,20 @@ services:
         sync: false
       - key: WHATSAPP_VERIFY_TOKEN
         sync: false
+
+      # Tech Provider platform. The app credentials identify this deployment
+      # to Meta for every tenant; the encryption key protects the access
+      # tokens we hold on their behalf and is mandatory in production.
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_ES_CONFIG_ID
+        sync: false
+      # Entered by hand rather than generated: the platform needs 32 bytes in
+      # a known encoding, and a generated value of another shape would stop
+      # the service booting. Produce one with: openssl rand -hex 32
+      - key: PLATFORM_ENCRYPTION_KEY
+        sync: false
+      - key: PLATFORM_PUBLIC_URL
+        sync: false

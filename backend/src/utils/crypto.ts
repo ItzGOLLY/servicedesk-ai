@@ -39,17 +39,25 @@ function encryptionKey(): Buffer {
     return crypto.createHash('sha256').update(`dev-key:${env.jwtAccessSecret}`).digest();
   }
 
+  // Exactly 32 bytes of hex or base64 is used as the key directly.
   const decoded = /^[0-9a-fA-F]{64}$/.test(configured)
     ? Buffer.from(configured, 'hex')
     : Buffer.from(configured, 'base64');
 
-  if (decoded.length !== KEY_BYTES) {
-    throw new Error(
-      `PLATFORM_ENCRYPTION_KEY must decode to ${KEY_BYTES} bytes, got ${decoded.length}. ` +
-        'Generate one with: openssl rand -hex 32'
-    );
+  if (decoded.length === KEY_BYTES) return decoded;
+
+  // Anything else with enough entropy is derived with SHA-256 rather than
+  // rejected. Platforms that generate secrets for you (Render's
+  // generateValue, for one) do not promise a particular length or encoding,
+  // and refusing them would mean a deployment that cannot start.
+  if (configured.length >= 32) {
+    return crypto.createHash('sha256').update(configured).digest();
   }
-  return decoded;
+
+  throw new Error(
+    'PLATFORM_ENCRYPTION_KEY is too short to be a key: supply 32 bytes of hex or base64, ' +
+      'or at least 32 random characters. Generate one with: openssl rand -hex 32'
+  );
 }
 
 /**

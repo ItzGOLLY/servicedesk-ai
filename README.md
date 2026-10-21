@@ -2,9 +2,16 @@
 
 [![CI](https://github.com/ItzGOLLY/servicedesk-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/ItzGOLLY/servicedesk-ai/actions/workflows/ci.yml)
 
-**A cloud-native customer support SaaS platform for small businesses.**
+**A cloud-native WhatsApp integration platform — and the support desk built on it.**
 
-Receive customer complaints, turn them into trackable support tickets, route them to the right agent, and give that agent AI assistance — classification, summaries and draft replies — so small teams can respond like large ones.
+Businesses connect their own WhatsApp Business number through Meta's Embedded Signup and get a routed, API-accessible messaging platform — the model Twilio and AiSensy operate. ServiceDesk AI, the AI-assisted support desk, is the first app running on it: complaints become trackable tickets, routed to an agent who gets classification, summaries and draft replies.
+
+| Layer | What it does |
+|---|---|
+| **Platform** | Tenant onboarding via Embedded Signup v4, one webhook routed to many businesses by `phone_number_id`, per-tenant API keys, signed outbound webhooks, templates, broadcasts, usage metering |
+| **Apps on it** | The ServiceDesk helpdesk — tickets, agents, AI assistance, dashboards — running as tenant one |
+
+See [`docs/PLATFORM_ARCHITECTURE.md`](docs/PLATFORM_ARCHITECTURE.md) and [`docs/META_APPROVAL_PATH.md`](docs/META_APPROVAL_PATH.md).
 
 Built for **BCSE408L – Cloud Computing**, School of Computer Science Engineering and Information Systems, VIT Chennai (AY 2026–2027).
 
@@ -43,7 +50,7 @@ The table below reflects what is **actually built and verified**, not what is pl
 
 - Backend and frontend typecheck and build under strict TypeScript
 - **`docker compose up` brings up the whole stack** — pgvector Postgres, migrations, seed, API, frontend — verified working
-- **161 automated tests pass** against a real PostgreSQL using production migrations
+- **191 automated tests pass** against a real PostgreSQL using production migrations, 30 of them covering tenant isolation
 - **CI is green** on GitHub Actions: backend, frontend and Docker image builds
 - RAG verified end to end: articles chunked, embedded, retrieved by cosine similarity, answered with citations
 - AI metrics measured, not asserted — see [AI evaluation](#ai-evaluation)
