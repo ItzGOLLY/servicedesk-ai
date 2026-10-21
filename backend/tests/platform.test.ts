@@ -94,6 +94,28 @@ describe('Credential encryption (unit)', () => {
     expect('EAAG-secret').not.toContain(print);
   });
 
+  it('derives a usable key from every supported encoding', () => {
+    // The deployment supplies this value, and the shapes differ by platform:
+    // 32 bytes of hex, 32 bytes of base64, or a long generated string. All
+    // must work, because the alternative is a service that will not boot.
+    const original = env.platformEncryptionKey;
+
+    for (const candidate of [
+      crypto.randomBytes(32).toString('hex'),
+      crypto.randomBytes(32).toString('base64'),
+      'a-generated-secret-of-more-than-32-characters',
+    ]) {
+      (env as { platformEncryptionKey: string }).platformEncryptionKey = candidate;
+      expect(decryptSecret(encryptSecret('business-token'))).toBe('business-token');
+    }
+
+    // Too little entropy to be a key: refused rather than silently padded.
+    (env as { platformEncryptionKey: string }).platformEncryptionKey = 'tooshort';
+    expect(() => encryptSecret('business-token')).toThrow(/too short/i);
+
+    (env as { platformEncryptionKey: string }).platformEncryptionKey = original;
+  });
+
   it('issues API keys that are stored only as hashes', () => {
     const { key, prefix, hash } = generateApiKey();
 
