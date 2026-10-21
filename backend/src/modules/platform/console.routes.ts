@@ -112,14 +112,10 @@ platformConsoleRouter.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { code, waba_id: wabaId, phone_number_id: phoneNumberId } = req.body;
 
-    if (!env.metaAppId || !env.metaAppSecret) {
-      throw new ApiError(
-        503,
-        'NOT_CONFIGURED',
-        'This deployment has no Meta app credentials, so onboarding cannot complete.'
-      );
-    }
-
+    // Checked before the configuration test because this one can never
+    // succeed: 503 invites a retry, and a conflict is permanent until the
+    // other workspace disconnects.
+    //
     // A WABA already held by a different tenant must not be silently moved:
     // that would hand one business another's messages.
     const existing = await queryOne<{ tenant_id: string }>(
@@ -128,6 +124,14 @@ platformConsoleRouter.post(
     );
     if (existing && existing.tenant_id !== tenantId(req)) {
       throw ApiError.conflict('This WhatsApp account is already connected to another workspace.');
+    }
+
+    if (!env.metaAppId || !env.metaAppSecret) {
+      throw new ApiError(
+        503,
+        'NOT_CONFIGURED',
+        'This deployment has no Meta app credentials, so onboarding cannot complete.'
+      );
     }
 
     try {
