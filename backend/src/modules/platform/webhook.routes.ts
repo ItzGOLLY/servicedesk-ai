@@ -93,6 +93,14 @@ platformWebhookRouter.post(
         }
       }
 
+      for (const update of outcome.accountUpdates) {
+        try {
+          await router.applyAccountUpdate(update);
+        } catch (error) {
+          log.error({ err: (error as Error).message }, 'account update failed');
+        }
+      }
+
       for (const status of outcome.statuses) {
         try {
           await router.applyStatus(status);

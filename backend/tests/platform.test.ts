@@ -282,6 +282,43 @@ describe('Tenant routing and isolation (integration)', () => {
     expect(contacts[0].name).toBe('Test Person');
   });
 
+  it('marks a connection as errored when Meta reports a ban', async () => {
+    const body = {
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: 'waba-pn-globex',
+          changes: [
+            {
+              field: 'account_update',
+              value: { event: 'ACCOUNT_VIOLATION', ban_info: { waba_ban_state: 'SCHEDULE_FOR_DISABLE' } },
+            },
+          ],
+        },
+      ],
+    };
+
+    const response = await post(body);
+    expect(response.status).toBe(200);
+
+    const connection = await queryOne<{ status: string; error_detail: string; tenant_id: string }>(
+      `SELECT status::TEXT AS status, error_detail, tenant_id FROM wa_connections WHERE waba_id = 'waba-pn-globex'`
+    );
+    expect(connection!.status).toBe('ERROR');
+    expect(connection!.error_detail).toContain('ACCOUNT_VIOLATION');
+    // Attributed to the owning tenant, not to whoever happened to be first.
+    expect(connection!.tenant_id).toBe(globex);
+  });
+
+  it('ignores an account update for an account this platform does not hold', async () => {
+    const body = {
+      object: 'whatsapp_business_account',
+      entry: [{ id: 'waba-unknown', changes: [{ field: 'account_update', value: { event: 'ACCOUNT_VIOLATION' } }] }],
+    };
+
+    await expect(post(body)).resolves.toMatchObject({ status: 200 });
+  });
+
   it('meters inbound messages against the receiving tenant', async () => {
     await post(metaBody('pn-acme', '+919000000015', 'My payment was taken twice this morning.'));
 

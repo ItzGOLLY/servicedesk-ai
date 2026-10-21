@@ -64,6 +64,21 @@ interface MetaWebhookBody {
   entry?: Array<{ id?: string; changes?: Array<{ field?: string; value?: MetaValue }> }>;
 }
 
+/**
+ * account_update — Meta's notification about an onboarded account itself.
+ *
+ * Subscribing to this field is required of a Tech Provider. It is how we learn
+ * that a customer finished Embedded Signup, and, more importantly, that one of
+ * their numbers was banned, restricted or had its quality downgraded. Without
+ * it the first sign of trouble is messages silently failing.
+ */
+export interface AccountUpdate {
+  wabaId: string;
+  event: string;
+  phoneNumber: string | null;
+  reason: string | null;
+}
+
 export interface RoutedMessage {
   route: NumberRoute;
   providerMessageId: string;
@@ -84,6 +99,7 @@ export interface RoutedStatus {
 export interface RoutingOutcome {
   messages: RoutedMessage[];
   statuses: RoutedStatus[];
+  accountUpdates: AccountUpdate[];
   /** Deliveries whose number is not onboarded here, or whose tenant is suspended. */
   unroutable: number;
 }
@@ -97,7 +113,7 @@ export interface RoutingOutcome {
  */
 export async function route(body: unknown): Promise<RoutingOutcome> {
   const payload = body as MetaWebhookBody | undefined;
-  const outcome: RoutingOutcome = { messages: [], statuses: [], unroutable: 0 };
+  const outcome: RoutingOutcome = { messages: [], statuses: [], accountUpdates: [], unroutable: 0 };
 
   if (payload?.object !== 'whatsapp_business_account' || !Array.isArray(payload.entry)) {
     return outcome;
@@ -116,6 +132,31 @@ export async function route(body: unknown): Promise<RoutingOutcome> {
   for (const entry of payload.entry) {
     for (const change of entry.changes ?? []) {
       const value = change.value;
+
+      // account_update arrives keyed by the account (entry.id), not by a
+      // phone number, so it is handled before the number-based routing below.
+      if (change.field === 'account_update') {
+        const update = value as unknown as {
+          event?: string;
+          phone_number?: string;
+          ban_info?: { waba_ban_state?: string };
+          restriction_info?: Array<{ restriction_type?: string }>;
+        };
+
+        if (entry.id && update.event) {
+          outcome.accountUpdates.push({
+            wabaId: entry.id,
+            event: update.event,
+            phoneNumber: update.phone_number ?? null,
+            reason:
+              update.ban_info?.waba_ban_state ??
+              update.restriction_info?.[0]?.restriction_type ??
+              null,
+          });
+        }
+        continue;
+      }
+
       const phoneNumberId = value?.metadata?.phone_number_id;
       if (!value || !phoneNumberId) continue;
 
@@ -229,6 +270,48 @@ export async function touchContact(
      RETURNING id`,
     [tenantId, waNumber, profileName]
   );
+}
+
+/**
+ * Applies an account_update to the connection it concerns.
+ *
+ * A ban or a disable is recorded on the connection and surfaced to the tenant,
+ * because every send against that account will now fail and the tenant needs
+ * to know why rather than discovering it message by message.
+ */
+export async function applyAccountUpdate(update: AccountUpdate): Promise<void> {
+  const connection = await queryOne<{ id: string; tenant_id: string }>(
+    'SELECT id, tenant_id FROM wa_connections WHERE waba_id = $1',
+    [update.wabaId]
+  );
+  if (!connection) return;
+
+  const disabling = ['ACCOUNT_VIOLATION', 'ACCOUNT_RESTRICTION', 'DISABLED_UPDATE', 'ACCOUNT_DELETED'];
+  const isDisabling = disabling.includes(update.event);
+
+  await query(
+    `UPDATE wa_connections
+        SET status = CASE WHEN $2 THEN 'ERROR'::wa_connection_status ELSE status END,
+            error_detail = CASE WHEN $2 THEN $3 ELSE error_detail END
+      WHERE id = $1`,
+    [
+      connection.id,
+      isDisabling,
+      `Meta reported ${update.event}${update.reason ? ` (${update.reason})` : ''}.`,
+    ]
+  );
+
+  log.warn(
+    { tenantId: connection.tenant_id, event: update.event, disabling: isDisabling },
+    'account update received'
+  );
+
+  await webhooks.emit(connection.tenant_id, 'connection.status', {
+    waba_id: update.wabaId,
+    event: update.event,
+    phone_number: update.phoneNumber,
+    reason: update.reason,
+  });
 }
 
 /** Append-only metering, used by the analytics endpoints. */
