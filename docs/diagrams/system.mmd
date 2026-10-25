@@ -12,8 +12,8 @@ flowchart LR
     AI["AI adapter<br/>Claude ⇄ rule-based fallback"]
     RAG["Knowledge base (RAG)<br/>chunk → embed → retrieve → cite"]
   end
-  subgraph D["Data tier — Render managed PostgreSQL 16"]
-    PG[("PostgreSQL 16 + pgvector<br/>HNSW vector index · GIN full-text")]
+  subgraph D["Data tier — Neon serverless PostgreSQL"]
+    PG[("PostgreSQL + pgvector<br/>HNSW vector index · GIN full-text")]
   end
   META["Meta WhatsApp Cloud API"]
   ANTH["Anthropic API"]

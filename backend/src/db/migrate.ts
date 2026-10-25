@@ -45,7 +45,23 @@ async function migrate(): Promise<void> {
       log.info({ file }, 'migration applied');
     } catch (error) {
       await client.query('ROLLBACK');
-      throw new Error(`Migration ${file} failed: ${(error as Error).message}`);
+      const detail = (error as Error).message;
+
+      // Managed providers run the application as a non-superuser, and most do
+      // not treat pgvector as a trusted extension. The database owner can
+      // still create it by hand, after which this migration is a no-op — but
+      // the raw message does not say so, and this is the first thing a new
+      // deployment hits.
+      if (/permission denied to create extension/i.test(detail)) {
+        throw new Error(
+          `Migration ${file} failed: ${detail}\n` +
+            'The database user may not create extensions. Run this once as the ' +
+            'database owner (for example in your provider\u2019s SQL console), then deploy again:\n' +
+            '  CREATE EXTENSION IF NOT EXISTS vector;'
+        );
+      }
+
+      throw new Error(`Migration ${file} failed: ${detail}`);
     } finally {
       client.release();
     }

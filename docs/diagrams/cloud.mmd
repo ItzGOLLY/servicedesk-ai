@@ -5,9 +5,11 @@ flowchart TB
   subgraph V["Vercel — PaaS / global CDN"]
     FE["Frontend (static Vite build)<br/>one public variable: VITE_API_BASE_URL"]
   end
-  subgraph R["Render — PaaS, region Singapore (render.yaml Blueprint)"]
+  subgraph R["Render — PaaS (render.yaml Blueprint)"]
     API["Web service: servicedesk-api<br/>npm run migrate && npm start<br/>health check /api/health"]
-    DB[("Managed PostgreSQL 16<br/>pgvector · private network")]
+  end
+  subgraph N["Neon — serverless PostgreSQL (DBaaS)"]
+    DB[("PostgreSQL + pgvector<br/>TLS · auto-suspend when idle")]
   end
   subgraph M["Meta — WhatsApp Business Platform"]
     WABA["Tenant WhatsApp Business Accounts<br/>onboarded via Embedded Signup v4"]
@@ -15,7 +17,7 @@ flowchart TB
   UR["UptimeRobot<br/>5-min keep-alive"]
   U["Users' browsers"] -->|HTTPS| FE
   FE -->|"HTTPS + CORS allow-list"| API
-  API -->|"internal URL, SSL"| DB
+  API -->|"connection string over TLS"| DB
   GH -->|"push to main → auto deploy"| FE
   GH -->|"push to main → auto deploy"| API
   WABA -->|"POST /api/webhooks/meta<br/>X-Hub-Signature-256"| API

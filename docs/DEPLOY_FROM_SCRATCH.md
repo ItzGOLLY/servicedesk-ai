@@ -3,7 +3,7 @@
 Assumes nothing exists. Follow top to bottom; do not skip ahead, because each
 part needs a value produced by the one before it.
 
-**Total: ~45 minutes** for a working live site. Parts 6 and 7 (WhatsApp and
+**Total: ~45 minutes** for a working live site. Parts 7 and 8 (WhatsApp and
 Embedded Signup) add ~35 minutes and can be done later.
 
 ---
@@ -13,18 +13,21 @@ Embedded Signup) add ~35 minutes and can be done later.
 | You need | Why |
 |---|---|
 | GitHub account with the repo pushed | Render and Vercel deploy from it |
-| A new Render account | Database + API |
-| A Vercel account | Frontend |
-| (Parts 6–7) A Meta developer account | WhatsApp |
+| A Neon account | PostgreSQL — free, permanent, no card |
+| A Render account | The API — free web service, no card |
+| A Vercel account | Frontend — free, no card |
+| (Parts 7–8) A Meta developer account | WhatsApp |
+
+**None of these require a payment card.**
 
 **Keep a scratch note open.** You will produce four values and reuse each
 several times:
 
 ```
-API URL     = ____________________________   (Part 1)
-DB external = ____________________________   (Part 2)
-SITE URL    = ____________________________   (Part 3)
-ENCRYPT KEY = ____________________________   (Part 1, from openssl)
+DB URL      = ____________________________   (Part 1, from Neon)
+API URL     = ____________________________   (Part 2, from Render)
+SITE URL    = ____________________________   (Part 4, from Vercel)
+ENCRYPT KEY = ____________________________   (Part 0, from openssl)
 ```
 
 Generate the encryption key now and paste it into the note:
@@ -35,45 +38,94 @@ openssl rand -hex 32
 
 ---
 
-## Part 1 — Render: database + API together (~15 min)
+## Part 1 — Neon: the database (~8 min)
 
-The repo contains `render.yaml`, a Blueprint that creates both at once and
-wires the database connection automatically. Use it rather than creating
-services by hand — it also pins both to the **same region**, which is required
-for the internal connection to resolve.
+The database is provisioned on Neon rather than Render. Render's free
+PostgreSQL is deleted 30 days after creation and replacing it requires a paid
+plan; Neon's free plan is permanent, needs **no payment card**, and carries the
+`pgvector` extension this project requires. Neon's own documentation states
+pgvector is "available on every Neon plan with no add-on or paid tier
+required".
+
+1. **neon.com** → **Sign up** (GitHub or Google). No card is requested.
+2. **Create project**:
+
+   | Field | Value |
+   |---|---|
+   | Project name | `servicedesk` |
+   | Postgres version | **16** if offered (17 also works) |
+   | Region | **Singapore** or whichever is nearest you |
+
+3. On the project dashboard, open **Connection string** and choose the
+   **direct** connection, *not* the pooled one. This workload is small, and the
+   direct string avoids the prepared-statement caveats of connection poolers.
+   It looks like:
+
+   ```
+   postgresql://user:password@ep-xxxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+   ```
+
+   **Copy it into your note as DB URL.** It contains the password, so treat it
+   as a secret — it goes into Render's environment, never into the repository.
+
+4. **Enable pgvector — do not skip this.** Open the **SQL Editor** in the Neon
+   console and run:
+
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   ```
+
+   Managed providers run your application as a non-superuser, and most
+   PostgreSQL builds do not treat `pgvector` as a trusted extension. Verified
+   locally against a non-superuser database: without this step migration 003
+   fails with *permission denied to create extension "vector"* and the API
+   never boots. With it, all 24 tables are created with no errors, because the
+   migration's `CREATE EXTENSION IF NOT EXISTS` then does nothing.
+
+   If you forget, the migration log tells you exactly this and names the
+   command to run.
+
+> **Free plan notes.** Compute suspends after about five minutes idle and wakes
+> on the next query, so the first request after a pause is slower. Storage and
+> monthly compute hours are capped well above what this project uses.
+
+---
+
+## Part 2 — Render: the API (~12 min)
+
+Render's free **web service** remains free and needs no payment card. Only its
+database product was the problem, and the Blueprint no longer asks for one.
 
 1. **render.com** → **Get Started** → **Sign in with GitHub** → authorise.
 2. Dashboard → **New +** → **Blueprint**.
 3. **Connect** your `servicedesk-ai` repository. If it is not listed:
    *Configure account* → grant Render access to it.
-4. Branch: **main**. Render reads `render.yaml` and shows two resources:
-   `servicedesk-db` and `servicedesk-api`. Give the blueprint any name.
-5. **It will prompt for 18 environment variables.** Fill in only these three:
+4. Branch: **main**. Render reads `render.yaml` and shows one resource,
+   `servicedesk-api`. **No database is created, so nothing asks for payment.**
+5. It prompts for environment variables. Fill in only these four:
 
    | Variable | Value |
    |---|---|
-   | `CORS_ORIGIN` | `http://localhost:5173` — a placeholder; corrected in Part 4 |
-   | `PLATFORM_ENCRYPTION_KEY` | the `openssl rand -hex 32` value from your note |
+   | `DATABASE_URL` | the Neon **direct** connection string from Part 1 |
+   | `CORS_ORIGIN` | `http://localhost:5173` — a placeholder, corrected in Part 5 |
    | `WHATSAPP_PROVIDER` | `simulator` |
+   | `PLATFORM_ENCRYPTION_KEY` | your `openssl rand -hex 32` value — **only needed for Part 8**; leave blank for now if you prefer |
 
    **Leave every other box empty.** They are optional; empty values make the
-   app use its offline providers, and everything still works. You will fill the
-   WhatsApp and Meta ones in Parts 6 and 7.
+   app use its offline providers, and everything still works. Verified: with
+   only `DATABASE_URL` and `CORS_ORIGIN` set, the API boots in production mode,
+   reports its database connected, signs users in and answers CORS preflights.
 
-   *Verified:* with exactly these three set, the API boots in production mode,
-   serves `/api/health` as connected, signs users in, answers CORS preflights,
-   and the Connect WhatsApp page reports `configured: false` honestly instead
-   of erroring.
+   In practice **`DATABASE_URL` is the only value you must paste** to get a
+   working deployment.
 
-6. **Apply** / **Create**. Build takes ~4 minutes.
+6. **Apply**. The build takes ~4 minutes: `npm ci --include=dev && npm run
+   build`, then on start `npm run migrate && npm start`. Migrations run against
+   Neon automatically on every boot, so the schema is always current.
 
-   What happens: `npm ci --include=dev && npm run build`, then on start
-   `npm run migrate && npm start`. Migrations run automatically on every boot,
-   so the schema is always current.
-
-7. When it is **Live**, open `servicedesk-api` and copy the URL at the top —
-   it looks like `https://servicedesk-api-xxxx.onrender.com`.
-   **Write it into your note as API URL.**
+7. When it is **Live**, copy the service URL from the top of the page —
+   `https://servicedesk-api-xxxx.onrender.com`. **Write it into your note as
+   API URL.**
 
 8. Check it:
 
@@ -81,21 +133,19 @@ for the internal connection to resolve.
    https://<API URL>/api/health
    ```
 
-   Must show `"database":"connected"`. If it does not, go to **Troubleshooting**.
+   Must show `"database":"connected"`. If not, see **Troubleshooting**.
 
-> **Free tier facts you must know**
-> - The database **expires after 30 days**. Diarise it. When it expires the API
->   stops booting entirely, because migrations cannot run.
-> - The web service **sleeps after 15 minutes idle** and takes ~50 s to wake.
+> **Free tier note.** The web service sleeps after 15 minutes idle and takes
+> ~50 s to wake. Part 9 sets up a keep-alive ping.
 
 ---
 
-## Part 2 — Seed the demo data (~5 min)
+## Part 3 — Seed the demo data (~5 min)
 
-Render's free plan has no Shell, so run this from your laptop.
+Render's free plan has no Shell, so run this from your laptop. Neon's
+connection string works from anywhere, so no extra step is needed.
 
-1. Render → **servicedesk-db** → **Connect** → copy the **External Database
-   URL** (starts `postgresql://`). Put it in your note.
+1. Use the **DB URL** from Part 1.
 2. In the repo:
 
    ```bash
@@ -118,7 +168,7 @@ Render's free plan has no Shell, so run this from your laptop.
 
 ---
 
-## Part 3 — Vercel: the frontend (~10 min)
+## Part 4 — Vercel: the frontend (~10 min)
 
 1. **vercel.com** → **Sign up with GitHub**.
 2. **Add New → Project** → import `servicedesk-ai`.
@@ -149,7 +199,7 @@ Render's free plan has no Shell, so run this from your laptop.
 
 ---
 
-## Part 4 — Let them talk to each other (~5 min)
+## Part 5 — Let them talk to each other (~5 min)
 
 Until this is done, login fails with a network error.
 
@@ -171,7 +221,7 @@ Until this is done, login fails with a network error.
 
 ---
 
-## Part 5 — Checkpoint: confirm it works (~5 min)
+## Part 6 — Checkpoint: confirm it works (~5 min)
 
 Run this from the repo root, substituting your two URLs:
 
@@ -200,23 +250,23 @@ Then open **SITE URL** in a browser and sign in:
 The admin sidebar should show **Connect WhatsApp**, **Message log** and
 **Developers**. If it does not, Vercel built an older commit — redeploy it.
 
-**At this point you have a complete working live deployment.** Parts 6 and 7
+**At this point you have a complete working live deployment.** Parts 7 and 8
 are WhatsApp, which is additive.
 
 ---
 
-## Part 6 — WhatsApp messaging via Meta (~20 min)
+## Part 7 — WhatsApp messaging via Meta (~20 min)
 
 This makes real WhatsApp messages raise tickets and real replies reach phones.
 
-### 6a — Create the Meta app
+### 7a — Create the Meta app
 
 1. **developers.facebook.com** → log in → **My Apps → Create App**.
 2. Use case **Other** → type **Business** → name `ServiceDesk AI` → Create.
 3. **Add product → WhatsApp → Set up.** Meta creates a test WhatsApp Business
    account and a test sender number.
 
-### 6b — Collect five values
+### 7b — Collect five values
 
 | Value | Where |
 |---|---|
@@ -229,7 +279,7 @@ This makes real WhatsApp messages raise tickets and real replies reach phones.
 Still on **API Setup**, under **To** → **Manage phone number list** → add your
 own phone → enter the OTP WhatsApp sends. Add your teammate's too (max 5).
 
-### 6c — Set them on Render **before** touching the webhook
+### 7c — Set them on Render **before** touching the webhook
 
 Render → `servicedesk-api` → Environment:
 
@@ -246,7 +296,7 @@ Render → `servicedesk-api` → Environment:
 Save → wait for **Live**. Meta's webhook check calls your API, so it must be
 running with the verify token first.
 
-### 6d — Point Meta at your API
+### 7d — Point Meta at your API
 
 WhatsApp → **Configuration** → Webhook → **Edit**:
 
@@ -271,7 +321,7 @@ curl -X POST "https://graph.facebook.com/v22.0/<WABA_ID>/subscribed_apps" \
 `{"success":true}` means done. **Without this, nothing is ever delivered and
 nothing tells you why.**
 
-### 6e — Test
+### 7e — Test
 
 WhatsApp the test number from your verified phone:
 
@@ -293,7 +343,7 @@ make a permanent one: **business.facebook.com/settings → Users → System user
 
 ---
 
-## Part 7 — Embedded Signup: the platform demo (~15 min)
+## Part 8 — Embedded Signup: the platform demo (~15 min)
 
 This is what makes "Connect WhatsApp" open Meta's real onboarding dialog, so
 *other* businesses can join your platform.
@@ -344,7 +394,7 @@ App Review, whose prerequisite is verifying a registered company. See
 
 ---
 
-## Part 8 — Finish up (~5 min)
+## Part 9 — Finish up (~5 min)
 
 1. **Keep it awake.** uptimerobot.com → free account → **Add New Monitor** →
    HTTP(s) → `<API URL>/api/health` → every 5 minutes. The free API sleeps after
@@ -361,13 +411,14 @@ App Review, whose prerequisite is verifying a registered company. See
 | Symptom | Cause and fix |
 |---|---|
 | Build fails on `tsc: not found` | `NODE_ENV=production` dropped devDependencies. The Blueprint already uses `npm ci --include=dev`; if you created the service by hand, set that build command. |
-| Health shows database not connected | Database and API are in **different regions** — the internal URL only resolves within one. Recreate from the Blueprint, which pins both to Singapore. |
-| Health times out / API never boots | Free database expired (30 days). Create a new one, set `DATABASE_URL` to its **internal** URL, redeploy, re-seed. |
+| Health shows database not connected | Check `DATABASE_URL` is the Neon **direct** string and includes `?sslmode=require`, and that `DATABASE_SSL` is `true`. |
+| Health times out on the first request | Neon compute suspends when idle and Render's free instance sleeps. Both wake on the next request; allow ~50 s, then retry. |
+| Migration fails on `CREATE EXTENSION vector` | Run `CREATE EXTENSION IF NOT EXISTS vector;` once in Neon's SQL Editor (Part 1 step 4). |
 | Login fails with a network error | `CORS_ORIGIN` is not exactly your SITE URL. No trailing slash, `https`. |
 | `No route matches POST /auth/login` | `VITE_API_BASE_URL` is missing `/api`. Fix it **and redeploy** Vercel. |
 | Sidebar lacks Connect WhatsApp / Developers | Vercel built an old commit. Deployments → Redeploy latest. |
-| WhatsApp: no reply arrives | In order: is `subscribed_apps` done (6d)? Is `account_update`+`messages` subscribed? Does `META_APP_SECRET` match the app? Check admin → Message log for the real error. |
-| WhatsApp error code 190 | Access token expired — regenerate (6e). |
+| WhatsApp: no reply arrives | In order: is `subscribed_apps` done (7d)? Is `account_update`+`messages` subscribed? Does `META_APP_SECRET` match the app? Check admin → Message log for the real error. |
+| WhatsApp error code 190 | Access token expired — regenerate (7e). |
 | WhatsApp error code 131030 | Recipient not in the allowed list — add the phone under API Setup → To. |
 | "Connect with Facebook" greyed out | `META_APP_ID` or `META_ES_CONFIG_ID` not set on Render. |
 | Meta dialog errors immediately | SITE URL not in **Allowed Domains for the JavaScript SDK**, or you are on `http`/localhost. |
@@ -383,5 +434,5 @@ App Review, whose prerequisite is verifying a registered company. See
 | API | `<API URL>/api` |
 | API docs | `<API URL>/api/docs` |
 | Platform webhook | `<API URL>/api/webhooks/meta` |
-| Database | Render PostgreSQL 16 + pgvector, Singapore |
-| Cost | ₹0 — every service on its free tier |
+| Database | Neon PostgreSQL + pgvector (free plan, permanent) |
+| Cost | ₹0 — every service on its free tier, no payment card anywhere |

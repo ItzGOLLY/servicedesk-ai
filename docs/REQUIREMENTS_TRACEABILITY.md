@@ -51,7 +51,7 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 | FR-6 | Dashboard | `modules/reports/dashboard.routes.ts` | Manual (browser) | ✅ |
 | FR-7 | Notifications | `services/notifications.ts`, `notifications.routes.ts` | T-13 | ✅ |
 | FR-8 | Report generation | `reports.routes.ts` incl. CSV export | Manual | ✅ |
-| FR-9 | Cloud database integration | `db/pool.ts`, migrations, Render PostgreSQL | Suite runs on real PostgreSQL; live | ✅ |
+| FR-9 | Cloud database integration | `db/pool.ts`, migrations, managed PostgreSQL with pgvector | Suite runs on real PostgreSQL; live | ✅ |
 | FR-10 | Administrator module | `user-management/`, `administration/` | R-23 – R-26 | ✅ |
 
 ---

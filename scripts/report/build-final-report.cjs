@@ -164,7 +164,7 @@ c.push(h1('1. Abstract'));
 c.push(p('A small business that receives customer complaints across WhatsApp, email and telephone has no reliable record of what was reported, who is handling it, or whether it was ever resolved. Commercial helpdesk products solve this but are priced per agent per month and assume a dedicated support team, placing them beyond a three-person business.'));
 c.push(p('ServiceDesk AI addresses this in two layers. The upper layer is a cloud-native Software-as-a-Service support desk: every complaint becomes a ticket with a reference, an owner, a category, a priority and a tracked status, visible to the customer, actionable by a support agent and measurable by an administrator. The lower layer — and the substantial addition since the mid-semester reviews — is a WhatsApp integration platform: other businesses connect their own WhatsApp Business numbers through Meta’s Embedded Signup, and the system routes, stores and serves each business’s messages in isolation. This is the model operated commercially by Twilio and AiSensy, and the support desk is simply the first application running on it.'));
 c.push(p('Three user roles are implemented — Customer, Support Agent and Administrator — with role-based access control enforced in the API rather than the interface. Major features include a guarded six-state ticket lifecycle, threaded conversations with staff-only internal notes, full-text search with filtering and pagination, persistent notifications, three role-specific dashboards, seven exportable reports, an administration module with an audit log, a two-way WhatsApp channel, an AI assistance layer that classifies and drafts but never messages a customer without agent approval, and a knowledge base answering questions from indexed articles using vector similarity search.'));
-c.push(p(`The application is deployed on public cloud infrastructure: the React frontend on Vercel's global CDN, the Express/TypeScript API and a managed PostgreSQL 16 instance on Render, provisioned from a version-controlled Blueprint. Correctness is evidenced by ${CFG.testCount} automated tests executed against a real PostgreSQL database using the production migration files, all passing, and run by continuous integration on every push.`));
+c.push(p(`The application is deployed on public cloud infrastructure: the React frontend on Vercel's global CDN, the Express/TypeScript API on Render from a version-controlled Blueprint, and a managed PostgreSQL instance on Neon. Correctness is evidenced by ${CFG.testCount} automated tests executed against a real PostgreSQL database using the production migration files, all passing, and run by continuous integration on every push.`));
 c.push(p([b('Keywords: '), t('Cloud Computing, Software as a Service, Platform as a Service, Multi-Tenancy, Customer Support, Ticket Management, Role-Based Access Control, REST API, PostgreSQL, pgvector, React, Node.js, WhatsApp Business Platform, Embedded Signup, Retrieval-Augmented Generation, Graceful Degradation.')]));
 
 // ─── 2 Introduction ───────────────────────────────────────────────────────────
@@ -357,8 +357,8 @@ c.push(caption('Figure 10.1 — Cloud deployment architecture'));
 c.push(h2('10.1 Cloud services used'));
 c.push(table(['Layer', 'Service', 'Cloud model', 'Why this choice'], [
   ['Frontend hosting', 'Vercel', 'PaaS / CDN', 'A static build cached at the edge close to the user; automatic deployment on push; generous free tier'],
-  ['Application hosting', 'Render Web Service (Singapore)', 'PaaS', 'The platform owns the Node runtime, TLS termination and restarts; supports infrastructure as code; Singapore is the nearest region to India on the permitted list'],
-  ['Database', 'Render PostgreSQL 16', 'DBaaS', 'Managed backups, SSL and connection limits, with the pgvector extension available; same region and private network as the API'],
+  ['Application hosting', 'Render Web Service', 'PaaS', 'The platform owns the Node runtime, TLS termination and restarts, and supports infrastructure as code; its free web service requires no payment card'],
+  ['Database', 'Neon serverless PostgreSQL', 'DBaaS', 'A permanently free plan requiring no payment card, carrying the pgvector extension this project needs, with TLS and compute that suspends when idle'],
   ['Messaging', 'Meta WhatsApp Cloud API', 'SaaS API', 'The official WhatsApp Business Platform; supports multi-customer onboarding through Embedded Signup'],
   ['Continuous integration', 'GitHub Actions', 'SaaS', 'Typecheck, the full test suite against a real PostgreSQL service container, and frontend and container builds on every push'],
   ['Uptime monitoring', 'UptimeRobot', 'SaaS', 'A five-minute health-check ping, so the free instance does not sleep before an evaluation'],
@@ -368,7 +368,7 @@ c.push(h2('10.2 Infrastructure as code'));
 c.push(p([t('The file '), mono('render.yaml'), t(' at the repository root defines the database and the web service together: plan, region, the Node build, a start command that applies migrations before the server binds its port, the health-check path, automatically generated JWT secrets, the database connection string wired from the database resource, and every third-party secret marked so that it is entered once in the dashboard and never stored in the repository. During the first deployment the database defaulted to a different region from the API, so the internal connection string did not resolve; the fix was one line in this file and a re-apply, which is precisely the value of defining infrastructure in version control.')]));
 c.push(h2('10.3 Security boundaries in the cloud'));
 c.push(...bullets([
-  'The database accepts connections only over the provider’s private network; the API uses the internal connection string over SSL.',
+  'The database is reached only over TLS, using a connection string held as a platform secret that is never committed to the repository.',
   'The browser holds exactly one configuration value, the API base URL. No AI key, messaging token or database credential ever reaches the client bundle.',
   'CORS is an exact-origin allow-list, which is required because the refresh cookie is sent with credentials.',
   'Inbound webhooks are signed by the provider and verified in constant time before any processing occurs.',
@@ -531,7 +531,7 @@ c.push(h2('16.1 Platforms used'));
 c.push(p('The frontend is deployed on Vercel and the API and database on Render, both from the project’s GitHub repository, with automatic deployment on every push to the default branch. The database and the API are created together from a Blueprint file held in version control rather than configured by hand.'));
 c.push(h2('16.2 Deployment process'));
 c.push(...numbered([
-  'The Blueprint is applied from the repository, creating the managed PostgreSQL instance and the API web service in the same region, generating the session signing secrets and wiring the database connection string automatically.',
+  'The database is created first on Neon, and its connection string is supplied to the Blueprint as a secret. The Blueprint is then applied from the repository, creating the API web service and generating the session signing secrets.',
   'The build installs dependencies and compiles TypeScript. Because the production environment omits development dependencies by default, the build command requests them explicitly, as the compiler and the migration runner are among them.',
   'On start, the service applies any outstanding migrations and only then binds its port, so the schema is current before new code serves traffic and a failed migration prevents a broken release.',
   'Demonstration data is seeded once through an idempotent script.',
@@ -546,7 +546,7 @@ c.push(table(['Problem', 'Resolution'], [
   ['Login failed from the browser with a network error', 'The allowed origin did not match the frontend address exactly; origins are now normalised and a rejection is logged with the configured list rather than surfacing as a server error'],
   ['The messaging provider’s trial tier refused free-form replies', 'A second provider was implemented behind the existing adapter interface; no other code changed'],
   ['Inbound messages were never delivered', 'The application had not been subscribed to the customer account’s webhooks — a step the provider’s dashboard does not perform. It is now an explicit, recorded step during onboarding'],
-  ['The free managed database expired after thirty days, taking the API down with it', 'A replacement instance was provisioned and the schema re-applied automatically on start; the expiry is now documented in the deployment runbook'],
+  ['The hosting provider\u2019s free managed database is deleted thirty days after creation, taking the API down with it because migrations run at start-up, and replacing it requires a paid plan', 'The database was moved to a provider whose free plan is permanent and carries the required vector extension. Only the connection string changed: the application reads a connection string and does not depend on which provider issued it'],
 ], [4.2, 5.8]));
 c.push(caption('Table 16.1 — Deployment problems and their resolutions'));
 
@@ -559,7 +559,7 @@ c.push(kv([
   ['Live application', CFG.liveUrl],
   ['REST API', `${CFG.apiUrl}/api`],
   ['Interactive API documentation', `${CFG.apiUrl}/api/docs`],
-  ['Database', 'Managed PostgreSQL 16 with pgvector (Render, Singapore)'],
+  ['Database', 'Neon serverless PostgreSQL with pgvector'],
   ['Repository', CFG.repoUrl],
   ['Hosting cost', 'Nil — every service on its free tier'],
 ]));

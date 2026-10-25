@@ -1,5 +1,10 @@
 # Review runbook — 30 minutes
 
+> **Superseded.** This runbook was written for the mid-semester review and refers to the earlier Render-hosted database.
+> The current procedure is in [`DEPLOY_FROM_SCRATCH.md`](DEPLOY_FROM_SCRATCH.md),
+> which provisions the database on Neon's permanently free plan.
+
+
 Everything in order, with timings. Read §1 tonight, §3 is what you actually do.
 
 ---

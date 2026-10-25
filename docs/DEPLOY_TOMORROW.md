@@ -1,5 +1,10 @@
 # Deploy + WhatsApp — step by step for the review
 
+> **Superseded.** This runbook described the earlier deployment, whose database was hosted on Render and expired after thirty days.
+> The current procedure is in [`DEPLOY_FROM_SCRATCH.md`](DEPLOY_FROM_SCRATCH.md),
+> which provisions the database on Neon's permanently free plan.
+
+
 Total time: **~60 minutes.** Do them in order; each step needs the one before it.
 Have your phone with WhatsApp ready.
 
