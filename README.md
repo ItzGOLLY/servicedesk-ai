@@ -22,8 +22,8 @@ Built for **BCSE408L – Cloud Computing**, School of Computer Science Engineeri
 | **Problem Statement** | Manage customer complaints and automate ticket handling |
 | **Target Users** | Customer · Support Agent · Admin |
 | **Live app** | https://servicedesk-ai-two.vercel.app |
-| **Live API** | https://servicedesk-api-ss2d.onrender.com/api |
-| **API docs (Swagger)** | https://servicedesk-api-ss2d.onrender.com/api/docs |
+| **Live API** | https://servicedesk-api-cea6.onrender.com/api |
+| **API docs (Swagger)** | https://servicedesk-api-cea6.onrender.com/api/docs |
 
 ---
 
@@ -58,7 +58,7 @@ The table below reflects what is **actually built and verified**, not what is pl
 **Deployed and verified live (19 September 2026):**
 
 - Frontend on **Vercel** — https://servicedesk-ai-two.vercel.app
-- API on **Render** (Singapore) from the [`render.yaml`](render.yaml) Blueprint — https://servicedesk-api-ss2d.onrender.com/api/health
+- API on **Render** (Singapore) from the [`render.yaml`](render.yaml) Blueprint — https://servicedesk-api-cea6.onrender.com/api/health
 - **Managed PostgreSQL 16 + pgvector** on Render, provisioned by the same Blueprint
 - **WhatsApp two-way channel live** through Meta's WhatsApp Cloud API — a customer message raises a ticket and receives an automatic reply; agent replies from the web app are delivered back to the chat
 - Screenshots of the live application are in [`screenshots/`](screenshots/)

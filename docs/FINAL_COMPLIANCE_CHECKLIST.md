@@ -18,7 +18,7 @@ Audited 17 August 2026 and re-audited 19 September 2026 (after deployment) again
 | Expected deliverables (8) | 8 | 0 | 0 |
 | Demonstration checklist (8) | 7 | 1 | 0 |
 
-**Deployed 19 September 2026.** Live app https://servicedesk-ai-two.vercel.app · API https://servicedesk-api-ss2d.onrender.com/api · managed PostgreSQL 16 + pgvector on Render · WhatsApp live through Meta's Cloud API. The one remaining 🟡 is the Q&A, which is preparation rather than code.
+**Deployed 19 September 2026.** Live app https://servicedesk-ai-two.vercel.app · API https://servicedesk-api-cea6.onrender.com/api · managed PostgreSQL 16 + pgvector on Render · WhatsApp live through Meta's Cloud API. The one remaining 🟡 is the Q&A, which is preparation rather than code.
 
 ---
 

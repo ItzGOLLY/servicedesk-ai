@@ -55,11 +55,11 @@ You only need to connect a real number. That is step 4.
 
 6. Wait for the build (~4 min). Migrations run automatically every time the API
    starts (`npm run migrate && npm start`).
-7. Copy the API URL. It looks like `https://servicedesk-api-xxxx.onrender.com`.
+7. Copy the API URL. It looks like `https://servicedesk-api-cea6.onrender.com`.
    **Write it down — you need it three more times.**
 8. Check it:
    ```
-   https://servicedesk-api-xxxx.onrender.com/api/health
+   https://servicedesk-api-cea6.onrender.com/api/health
    ```
    Must show `"database": "connected"`.
 
@@ -100,12 +100,12 @@ taking a minute to come up — click **Manual Deploy → Deploy latest commit**.
 
 | Name | Value |
 |---|---|
-| `VITE_API_BASE_URL` | `https://servicedesk-api-xxxx.onrender.com/api` ← your step 1 URL **+ `/api`** |
+| `VITE_API_BASE_URL` | `https://servicedesk-api-cea6.onrender.com/api` ← your step 1 URL **+ `/api`** |
 
    The `/api` on the end matters.
 
 5. **Deploy**. Wait ~2 min.
-6. Copy the frontend URL, e.g. `https://servicedesk-ai-xxxx.vercel.app`.
+6. Copy the frontend URL, e.g. `https://servicedesk-ai-two.vercel.app`.
 
 ---
 
@@ -116,7 +116,7 @@ Login will fail with a CORS error until you do this.
 1. Render dashboard → `servicedesk-api` → **Environment**.
 2. Edit `CORS_ORIGIN` → set to your Vercel URL **exactly**:
    ```
-   https://servicedesk-ai-xxxx.vercel.app
+   https://servicedesk-ai-two.vercel.app
    ```
    No trailing slash. `https`, not `http`.
 3. **Save** → Render redeploys (~2 min).
@@ -182,7 +182,7 @@ WhatsApp → **Configuration** → Webhook → **Edit**:
 
 | Field | Value |
 |---|---|
-| Callback URL | `https://servicedesk-api-ss2d.onrender.com/api/whatsapp/webhook` |
+| Callback URL | `https://servicedesk-api-cea6.onrender.com/api/whatsapp/webhook` |
 | Verify token | exactly what you put in `WHATSAPP_VERIFY_TOKEN` |
 
 **Verify and save.** Then on the same page → Webhook fields → **Manage** →
@@ -233,7 +233,7 @@ Render's free API **sleeps after 15 min idle** and takes ~50 s to wake. Do
 not let this bite you in front of the panel.
 
 1. **https://uptimerobot.com** → free account → **Add New Monitor**.
-2. Type: HTTP(s). URL: `https://servicedesk-api-xxxx.onrender.com/api/health`.
+2. Type: HTTP(s). URL: `https://servicedesk-api-cea6.onrender.com/api/health`.
    Interval: 5 minutes.
 
 And **open the app 5 minutes before you present** anyway.
@@ -245,9 +245,9 @@ And **open the app 5 minutes before you present** anyway.
 In `README.md` replace the "Not yet deployed" lines with:
 
 ```
-| **Live app** | https://servicedesk-ai-xxxx.vercel.app |
-| **Live API** | https://servicedesk-api-xxxx.onrender.com/api |
-| **API docs** | https://servicedesk-api-xxxx.onrender.com/api/docs |
+| **Live app** | https://servicedesk-ai-two.vercel.app |
+| **Live API** | https://servicedesk-api-cea6.onrender.com/api |
+| **API docs** | https://servicedesk-api-cea6.onrender.com/api/docs |
 ```
 
 Commit and push. Only after it's actually live.

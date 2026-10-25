@@ -133,7 +133,7 @@ CORS_ORIGIN=https://servicedesk-ai.vercel.app
 For preview deployments as well, comma-separate:
 
 ```
-CORS_ORIGIN=https://servicedesk-ai.vercel.app,https://servicedesk-ai-git-dev.vercel.app
+CORS_ORIGIN=https://servicedesk-ai.vercel.app,https://servicedesk-ai-two.vercel.app
 ```
 
 A wildcard `*` will not work here: the app sends credentials, and browsers reject a wildcard origin on credentialed requests.

@@ -423,7 +423,7 @@ c.push(caption('Table 12.1 — Implemented modules'));
 
 // ─── 13 User Interface Design ─────────────────────────────────────────────────
 c.push(h1('13. User Interface Design'));
-c.push(p('The interface is built on a hand-written design system rather than a component library: one accent colour, a neutral palette, consistent cards and tables, and explicit loading, empty and error states on every data view. It is responsive from 375 pixels, verified at phone, tablet and desktop widths. The screenshots below were captured from the deployed application.'));
+c.push(p('The interface is built on a hand-written design system rather than a component library: one accent colour, a neutral palette, consistent cards and tables, and explicit loading, empty and error states on every data view. It is responsive from 375 pixels, verified at phone, tablet and desktop widths. The screenshots below were captured from the deployed application at the live URL given in section 21, showing real data from the cloud database.'));
 
 const SHOT_LIST = [
   ['02-login.png', 'Figure 13.1 — Sign in'],
@@ -435,8 +435,9 @@ const SHOT_LIST = [
   ['12-whatsapp-console.png', 'Figure 13.7 — WhatsApp console: provider status and message log'],
   ['13-reports.png', 'Figure 13.8 — Reports with CSV export'],
   ['11-admin-users.png', 'Figure 13.9 — User management'],
-  ['15-mobile-queue.png', 'Figure 13.10 — Responsive layout at 390 pixels'],
-  ['14-swagger.png', 'Figure 13.11 — Interactive API documentation generated from the validation schemas'],
+  ['17-developers.png', 'Figure 13.10 — Developer console: an issued API key, whose \u201clast used\u201d timestamp records a successful call to the public API, and a registered webhook endpoint'],
+  ['15-mobile-queue.png', 'Figure 13.11 — Responsive layout at 390 pixels'],
+  ['14-swagger.png', 'Figure 13.12 — Interactive API documentation generated from the validation schemas'],
 ];
 for (const [f, cap] of SHOT_LIST) {
   c.push(img(f, f.startsWith('15-') ? 250 : 560));

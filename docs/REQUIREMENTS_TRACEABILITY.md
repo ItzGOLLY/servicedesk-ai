@@ -6,7 +6,7 @@ Every requirement from the three official BCSE408L documents, mapped to its impl
 
 **Status** — ✅ Done and verified · 🟡 Requires your preparation · ⬜ Deliberately out of scope
 
-**Live:** app https://servicedesk-ai-two.vercel.app · API https://servicedesk-api-ss2d.onrender.com/api · deployed 19 September 2026
+**Live:** app https://servicedesk-ai-two.vercel.app · API https://servicedesk-api-cea6.onrender.com/api · deployed 19 September 2026
 
 ---
 

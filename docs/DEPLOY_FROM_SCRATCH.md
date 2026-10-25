@@ -124,7 +124,7 @@ database product was the problem, and the Blueprint no longer asks for one.
    Neon automatically on every boot, so the schema is always current.
 
 7. When it is **Live**, copy the service URL from the top of the page —
-   `https://servicedesk-api-xxxx.onrender.com`. **Write it into your note as
+   `https://servicedesk-api-cea6.onrender.com`. **Write it into your note as
    API URL.**
 
 8. Check it:
@@ -187,11 +187,11 @@ connection string works from anywhere, so no extra step is needed.
    |---|---|
    | `VITE_API_BASE_URL` | `<API URL>/api` |
 
-   So: `https://servicedesk-api-xxxx.onrender.com/api` — **with `/api` on the
+   So: `https://servicedesk-api-cea6.onrender.com/api` — **with `/api` on the
    end**.
 
 5. **Deploy** (~2 min). Copy the resulting URL, e.g.
-   `https://servicedesk-ai-xxxx.vercel.app`. **Write it into your note as
+   `https://servicedesk-ai-two.vercel.app`. **Write it into your note as
    SITE URL.**
 
 > Vite bakes environment variables in **at build time**. If you ever change
@@ -207,7 +207,7 @@ Until this is done, login fails with a network error.
 2. Edit `CORS_ORIGIN` → set it to your **SITE URL**, exactly:
 
    ```
-   https://servicedesk-ai-xxxx.vercel.app
+   https://servicedesk-ai-two.vercel.app
    ```
 
    No trailing slash. `https`, not `http`.
@@ -226,8 +226,8 @@ Until this is done, login fails with a network error.
 Run this from the repo root, substituting your two URLs:
 
 ```bash
-API="https://servicedesk-api-xxxx.onrender.com"
-SITE="https://servicedesk-ai-xxxx.vercel.app"
+API="https://servicedesk-api-cea6.onrender.com"
+SITE="https://servicedesk-ai-two.vercel.app"
 
 echo "health:"; curl -s $API/api/health; echo
 echo "CORS:";   curl -s -o /dev/null -D - -X OPTIONS $API/api/auth/login \

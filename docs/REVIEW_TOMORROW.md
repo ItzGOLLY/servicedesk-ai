@@ -32,7 +32,7 @@ without any changes.
 4. `servicedesk-api` → **Environment** → set `DATABASE_URL` to that internal
    URL → **Save**. Render redeploys and migrations run automatically on start.
 5. Wait for **Live**, then check:
-   `https://servicedesk-api-ss2d.onrender.com/api/health` → must say
+   `https://servicedesk-api-cea6.onrender.com/api/health` → must say
    `"database":"connected"`.
 6. **Seed the demo data.** Copy the new database's **External Database URL**,
    then from the repo:
@@ -88,7 +88,7 @@ presentable, but far weaker than the dialog opening.
    | `META_APP_SECRET` | your App Secret |
    | `META_ES_CONFIG_ID` | the configuration ID from step 5 |
    | `PLATFORM_ENCRYPTION_KEY` | run `openssl rand -hex 32` and paste it |
-   | `PLATFORM_PUBLIC_URL` | `https://servicedesk-api-ss2d.onrender.com` |
+   | `PLATFORM_PUBLIC_URL` | `https://servicedesk-api-cea6.onrender.com` |
 
    Save → wait for **Live** (~3 min).
 7. Reload the site → **Connect WhatsApp** → the blue **Connect with Facebook**
@@ -217,5 +217,5 @@ Render → `servicedesk-api` → Deploys → find the deploy for commit `3782540
 | Customer | rohan@example.com | Customer@12345 |
 
 **Live:** https://servicedesk-ai-two.vercel.app ·
-API https://servicedesk-api-ss2d.onrender.com/api ·
-Docs https://servicedesk-api-ss2d.onrender.com/api/docs
+API https://servicedesk-api-cea6.onrender.com/api ·
+Docs https://servicedesk-api-cea6.onrender.com/api/docs
