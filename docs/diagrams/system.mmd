@@ -1,0 +1,31 @@
+flowchart LR
+  subgraph Clients
+    B["Browser<br/>React 18 · TypeScript · Tailwind"]
+    W["Customer's WhatsApp"]
+  end
+  subgraph P["Presentation tier — Vercel CDN"]
+    FE["Static Vite build"]
+  end
+  subgraph A["Application tier — Render, Singapore"]
+    EX["Express + TypeScript REST API<br/>Zod validation · JWT · two-layer RBAC · pino"]
+    PL["Platform services<br/>Embedded Signup · message router<br/>API keys · outbound webhooks"]
+    AI["AI adapter<br/>Claude ⇄ rule-based fallback"]
+    RAG["Knowledge base (RAG)<br/>chunk → embed → retrieve → cite"]
+  end
+  subgraph D["Data tier — Render managed PostgreSQL 16"]
+    PG[("PostgreSQL 16 + pgvector<br/>HNSW vector index · GIN full-text")]
+  end
+  META["Meta WhatsApp Cloud API"]
+  ANTH["Anthropic API"]
+  B -->|HTTPS| FE
+  B -->|HTTPS JSON /api| EX
+  W <--> META
+  META -->|"signed webhook"| PL
+  PL -->|"Graph API send"| META
+  EX --> PL
+  EX --> AI
+  EX --> RAG
+  EX --> PG
+  PL --> PG
+  RAG --> PG
+  AI -.->|optional| ANTH

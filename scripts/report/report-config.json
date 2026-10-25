@@ -1,0 +1,19 @@
+{
+  "projectTitle": "ServiceDesk AI — A Cloud-Native WhatsApp Integration Platform with an AI-Assisted Support Desk",
+  "member1": "Aarush Jagannathan — 23BLC1211",
+  "member2": "Gomatheswar M — 23BLC1195",
+  "faculty": "Dr. M Dinakaran",
+  "slot": "TO BE CONFIRMED",
+  "liveUrl": "PENDING_DEPLOYMENT",
+  "apiUrl": "PENDING_DEPLOYMENT",
+  "repoUrl": "https://github.com/ItzGOLLY/servicedesk-ai",
+  "deadline": "28/10/2026",
+  "testUser": "rohan@example.com",
+  "testPassword": "Customer@12345",
+  "agentUser": "priya.agent@servicedesk.ai",
+  "agentPassword": "Agent@12345",
+  "adminUser": "admin@servicedesk.ai",
+  "adminPassword": "Admin@12345",
+  "testCount": 193,
+  "verifiedOn": "PENDING_DEPLOYMENT"
+}

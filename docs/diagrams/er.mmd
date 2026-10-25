@@ -1,0 +1,126 @@
+erDiagram
+    users ||--o{ tickets : "raises (customer_id)"
+    users ||--o{ tickets : "handles (assigned_agent_id)"
+    users ||--o{ ticket_messages : "authors"
+    users ||--o{ ticket_events : "performs"
+    users ||--o{ notifications : "receives"
+    users ||--o{ audit_logs : "acts in"
+    categories ||--o{ tickets : "classifies"
+    tickets ||--o{ ticket_messages : "contains"
+    tickets ||--o{ ticket_events : "records"
+    tickets ||--o{ ai_suggestions : "generates"
+    tickets ||--o{ notifications : "references"
+    tickets ||--o{ whatsapp_messages : "conversation"
+    users ||--o{ whatsapp_messages : "sends and receives"
+
+    users {
+        uuid id PK
+        citext email UK
+        text password_hash
+        text full_name
+        user_role role
+        text phone
+        text whatsapp_number UK
+        boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    categories {
+        uuid id PK
+        text name UK
+        text description
+        boolean is_active
+        timestamptz created_at
+    }
+
+    tickets {
+        uuid id PK
+        text reference UK
+        uuid customer_id FK
+        uuid assigned_agent_id FK
+        uuid category_id FK
+        text subject
+        text description
+        ticket_priority priority
+        ticket_status status
+        ticket_sentiment sentiment
+        ticket_channel channel
+        text ai_summary
+        numeric ai_confidence
+        timestamptz ai_classified_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz first_response_at
+        timestamptz resolved_at
+        timestamptz closed_at
+    }
+
+    ticket_messages {
+        uuid id PK
+        uuid ticket_id FK
+        uuid author_id FK
+        text body
+        boolean is_internal_note
+        boolean ai_assisted
+        ticket_channel channel
+        timestamptz created_at
+    }
+
+    ticket_events {
+        uuid id PK
+        uuid ticket_id FK
+        uuid actor_id FK
+        text event_type
+        text from_value
+        text to_value
+        timestamptz created_at
+    }
+
+    ai_suggestions {
+        uuid id PK
+        uuid ticket_id FK
+        ai_suggestion_kind kind
+        jsonb content
+        text model
+        boolean used_fallback
+        boolean was_accepted
+        timestamptz created_at
+    }
+
+    notifications {
+        uuid id PK
+        uuid user_id FK
+        uuid ticket_id FK
+        text type
+        text title
+        text body
+        boolean is_read
+        timestamptz created_at
+    }
+
+    whatsapp_messages {
+        uuid id PK
+        wa_direction direction
+        text provider_message_id UK
+        text wa_number
+        text body
+        uuid ticket_id FK
+        uuid message_id FK
+        uuid user_id FK
+        wa_delivery_status status
+        text error_detail
+        text provider
+        timestamptz created_at
+    }
+
+    audit_logs {
+        uuid id PK
+        uuid actor_id FK
+        text action
+        text entity_type
+        uuid entity_id
+        jsonb metadata
+        text ip_address
+        timestamptz created_at
+    }
