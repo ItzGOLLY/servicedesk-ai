@@ -68,7 +68,27 @@ origin=$({ curl -s -m 30 -o /dev/null -D - -X OPTIONS "$API/api/auth/login" \
            | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}'; } || true)
 check "CORS allows the site" "$SITE" "${origin:-<none>}"
 
-# 4. Every credential printed in the report actually works.
+# 4. The deployed frontend actually targets this API.
+#
+# Vite bakes VITE_API_BASE_URL in at build time, so changing it in the
+# dashboard without redeploying leaves the old address in the bundle. The site
+# then loads perfectly and fails on the first request — which looks like a
+# backend fault and is not one.
+bundle=$({ curl -s -m 30 "$SITE" 2>/dev/null \
+           | grep -o 'assets/index-[A-Za-z0-9_-]*\.js' | head -1; } || true)
+if [[ -n "$bundle" ]]; then
+  referenced=$({ curl -s -m 60 "$SITE/$bundle" 2>/dev/null \
+                 | grep -o 'https://[a-z0-9.-]*\.onrender\.com' | sort -u | head -1; } || true)
+  check "frontend targets this API" "$API" "${referenced:-<none found>}"
+  if [[ -n "$referenced" && "$referenced" != "$API" ]]; then
+    echo "        the site is serving an older build: set VITE_API_BASE_URL to"
+    echo "        $API/api in Vercel, then REDEPLOY (a variable change alone does nothing)"
+  fi
+else
+  echo "  warn  frontend bundle                   could not be located; skipped"
+fi
+
+# 5. Every credential printed in the report actually works.
 for cred in \
   "admin@servicedesk.ai:Admin@12345" \
   "priya.agent@servicedesk.ai:Agent@12345" \
