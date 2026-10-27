@@ -195,9 +195,14 @@ whatsappRouter.get(
       rows.map((r) => ({
         id: r.id,
         direction: r.direction,
-        // Only the last four digits are shown; the console does not need to
-        // display full customer phone numbers to be useful.
-        number: `••••${r.wa_number.slice(-4)}`,
+        // The full number, deliberately. This is the tenant's own customer:
+        // an agent has to be able to call them back, paste the number into a
+        // CRM, or recognise a repeat caller. Masking it here would withhold a
+        // business's own data from itself.
+        //
+        // Masking still applies where it belongs — server logs, which are
+        // shipped to an aggregator and read by people outside the tenant.
+        number: r.wa_number,
         body: r.body,
         status: r.status,
         error: r.error_detail,

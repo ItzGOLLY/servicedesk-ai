@@ -257,7 +257,21 @@ export default function WhatsAppConsole() {
                         {message.status}
                       </span>
                       {/* Numbers are masked by the API; the console never shows them in full. */}
-                      <span className="font-mono text-xs text-slate-500">{message.number}</span>
+                      {/* Clicking a number loads it into the send form: reading a
+                          log entry and replying to it is one action, not two. */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSimulate((p) => ({ ...p, from: message.number }));
+                          void navigator.clipboard?.writeText(message.number);
+                          setActionNote(`${message.number} copied and loaded into the message form.`);
+                          setActionError('');
+                        }}
+                        title="Copy and use this number"
+                        className="font-mono text-xs text-slate-500 underline decoration-dotted underline-offset-2 hover:text-brand-600"
+                      >
+                        {message.number}
+                      </button>
                       {message.ticketReference && (
                         <span className="text-xs font-semibold text-brand-600">
                           {message.ticketReference}

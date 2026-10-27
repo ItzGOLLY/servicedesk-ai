@@ -460,7 +460,7 @@ describe('WhatsApp outbound and admin console', () => {
     expect(response.status).toBe(400);
   });
 
-  it('masks customer numbers in the admin message log', async () => {
+  it('shows the full customer number in the admin message log', async () => {
     await handleInbound(
       { providerMessageId: 'mask-1', from: customerNumber, body: 'My refund has not arrived yet.' },
       'simulator',
@@ -470,8 +470,10 @@ describe('WhatsApp outbound and admin console', () => {
     const response = await request(app).get('/api/whatsapp/admin/messages').set(auth(admin));
 
     expect(response.status).toBe(200);
-    expect(response.body.data[0].number).toMatch(/^••••\d{4}$/);
-    expect(response.body.data[0].number).not.toContain('91900');
+    // The tenant's own customer: an agent must be able to call them back, so
+    // withholding the number would hide a business's data from itself.
+    // Masking belongs in server logs, not here.
+    expect(response.body.data[0].number).toBe(customerNumber);
   });
 });
 
