@@ -105,7 +105,7 @@ export default function WhatsAppConsole() {
             </p>
             <p className="mt-0.5 text-sm text-slate-600">
               {status.simulated
-                ? 'Messages are recorded and shown here but not delivered to a real phone. Set WHATSAPP_PROVIDER=twilio with credentials to send for real.'
+                ? 'Messages are recorded and shown here but not delivered to a real phone. Set WHATSAPP_PROVIDER=meta with Cloud API credentials — or twilio — to send for real.'
                 : `Sending from ${status.fromNumber ?? 'the configured number'}.`}
             </p>
           </div>
