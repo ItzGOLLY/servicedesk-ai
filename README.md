@@ -4,11 +4,11 @@
 
 **A cloud-native WhatsApp integration platform — and the support desk built on it.**
 
-Businesses connect their own WhatsApp Business number through Meta's Embedded Signup and get a routed, API-accessible messaging platform — the model Twilio and AiSensy operate. ServiceDesk AI, the AI-assisted support desk, is the first app running on it: complaints become trackable tickets, routed to an agent who gets classification, summaries and draft replies.
+Businesses sign themselves up, connect their own WhatsApp Business number — through Meta's Embedded Signup, or with credentials they already hold — and get a routed, API-accessible messaging platform — the model Twilio and AiSensy operate. ServiceDesk AI, the AI-assisted support desk, is the first app running on it: complaints become trackable tickets, routed to an agent who gets classification, summaries and draft replies.
 
 | Layer | What it does |
 |---|---|
-| **Platform** | Tenant onboarding via Embedded Signup v4, one webhook routed to many businesses by `phone_number_id`, per-tenant API keys, signed outbound webhooks, templates, broadcasts, usage metering |
+| **Platform** | Business self-signup, tenant onboarding via Embedded Signup v4 *or* credentials a business already holds, one webhook routed to many businesses by `phone_number_id`, per-tenant API keys, signed outbound webhooks, templates, broadcasts, usage metering |
 | **Apps on it** | The ServiceDesk helpdesk — tickets, agents, AI assistance, dashboards — running as tenant one |
 
 See [`docs/PLATFORM_ARCHITECTURE.md`](docs/PLATFORM_ARCHITECTURE.md) and [`docs/META_APPROVAL_PATH.md`](docs/META_APPROVAL_PATH.md).
@@ -24,6 +24,34 @@ Built for **BCSE408L – Cloud Computing**, School of Computer Science Engineeri
 | **Live app** | https://servicedesk-ai-two.vercel.app |
 | **Live API** | https://servicedesk-api-cea6.onrender.com/api |
 | **API docs (Swagger)** | https://servicedesk-api-cea6.onrender.com/api/docs |
+
+---
+
+## Evaluating the live application
+
+No installation required. The application is public and these accounts were
+verified against the deployment on **27 October 2026**.
+
+| Role | Login | Password |
+|---|---|---|
+| Admin | `admin@servicedesk.ai` | `Admin@12345` |
+| Support Agent | `priya.agent@servicedesk.ai` | `Agent@12345` |
+| Customer | `rohan@example.com` | `Customer@12345` |
+
+Sign in at **https://servicedesk-ai-two.vercel.app**.
+
+To evaluate the *platform* rather than the support desk, follow **Connect your
+WhatsApp** from the landing page and create a workspace of your own: it starts
+empty, which is the tenant isolation being demonstrated, and its Connect screen
+offers both onboarding routes plus a setup guide.
+
+> The API runs on a free hosting tier that sleeps when idle, so the **first**
+> request after a period of inactivity takes roughly 30 seconds. Subsequent
+> requests are served in well under a second. Loading the site once and waiting
+> for it to settle avoids this.
+
+These are demonstration accounts created for evaluation. They are not personal
+passwords and are unrelated to any other account.
 
 ---
 
@@ -45,21 +73,22 @@ The table below reflects what is **actually built and verified**, not what is pl
 | **R1** | 20 August | Requirements, SRS, use cases, UI mockups | Complete |
 | **R2** | 17 September | Architecture, database, REST APIs, auth, core modules | Complete |
 | **R3 / Final Demo** | 15 October | Complete application, testing, reports, live URL | Complete — deployed and verified live |
+| **Final submission** | 28 October | Business self-signup, manual number connection, in-app setup guide, tenant read isolation | Complete — verified live 27 October |
 
 **Verified by running it, not by assuming:**
 
 - Backend and frontend typecheck and build under strict TypeScript
 - **`docker compose up` brings up the whole stack** — pgvector Postgres, migrations, seed, API, frontend — verified working
-- **191 automated tests pass** against a real PostgreSQL using production migrations, 30 of them covering tenant isolation
+- **214 automated tests pass** against a real PostgreSQL using production migrations, 53 of them covering the platform layer and 10 of those proving one tenant cannot read another's data
 - **CI is green** on GitHub Actions: backend, frontend and Docker image builds
 - RAG verified end to end: articles chunked, embedded, retrieved by cosine similarity, answered with citations
 - AI metrics measured, not asserted — see [AI evaluation](#ai-evaluation)
 
-**Deployed and verified live (19 September 2026):**
+**Deployed and verified live (re-verified 27 October 2026):**
 
 - Frontend on **Vercel** — https://servicedesk-ai-two.vercel.app
 - API on **Render** (Singapore) from the [`render.yaml`](render.yaml) Blueprint — https://servicedesk-api-cea6.onrender.com/api/health
-- **Managed PostgreSQL 16 + pgvector** on Render, provisioned by the same Blueprint
+- **Managed PostgreSQL + pgvector** on **Neon** (Singapore). The database was moved off Render's free plan, which is deleted thirty days after creation; Neon's free plan is permanent. Only the connection string changed
 - **WhatsApp two-way channel live** through Meta's WhatsApp Cloud API — a customer message raises a ticket and receives an automatic reply; agent replies from the web app are delivered back to the chat
 - Screenshots of the live application are in [`screenshots/`](screenshots/)
 
@@ -341,7 +370,7 @@ Responses follow one shape: `{ success, data, meta }` on success and `{ success:
 cd backend && npm test
 ```
 
-**127 tests, all passing**, run against a real PostgreSQL database using the same migration files as production — not mocks.
+**214 tests, all passing**, run against a real PostgreSQL database using the same migration files as production — not mocks.
 
 | Suite | Tests | Covers |
 |---|---|---|
@@ -349,9 +378,12 @@ cd backend && npm test
 | `authorization.test.ts` | 26 | Every role boundary, called directly against the API with the wrong role |
 | `tickets.test.ts` | 33 | CRUD, assignment, lifecycle transitions, messages, search and pagination |
 | `ai.test.ts` | 20 | Lifecycle rules, fallback classifier, and AI failure handling |
-| `whatsapp.test.ts` | 35 | Plain-text formatting, inbound flow, two-way delivery, idempotency |
+| `knowledge.test.ts` | 31 | Chunking, embedding, vector retrieval, lexical fallback, citations |
+| `whatsapp.test.ts` | 38 | Plain-text formatting, inbound flow, two-way delivery, idempotency |
+| `platform.test.ts` | 53 | Tenant isolation on every read path, credential encryption, API keys, webhook signing and retry, business self-signup, manual connection |
+| **Total** | **214** | |
 
-Two results worth noting: **ticket creation still succeeds when AI classification throws**, and **generating an AI draft creates zero customer-visible messages**. Full case-by-case results in [`docs/TESTING.md`](docs/TESTING.md).
+Three results worth noting: **ticket creation still succeeds when AI classification throws**, **generating an AI draft creates zero customer-visible messages**, and **a freshly signed-up workspace can read none of another business's tickets, users, audit entries or dashboard figures** — ten tests for that last one, each verified by reverting its fix and watching it fail. Full case-by-case results in [`docs/TESTING.md`](docs/TESTING.md).
 
 ---
 
