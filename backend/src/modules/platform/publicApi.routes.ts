@@ -151,6 +151,28 @@ publicApiRouter.get(
   })
 );
 
+/**
+ * GET /v1/messages/:id — one message by the id returned when it was sent.
+ *
+ * Scoped to the calling tenant, and 404 rather than 403 for someone else's
+ * id, so message identifiers cannot be probed across the platform.
+ */
+publicApiRouter.get(
+  '/messages/:id',
+  asyncHandler(async (req: Request, res: Response) => {
+    const message = await queryOne(
+      `SELECT provider_message_id AS id, direction, wa_number AS contact, body,
+              status::TEXT AS status, error_detail, created_at
+         FROM whatsapp_messages
+        WHERE tenant_id = $1 AND provider_message_id = $2`,
+      [tenantOf(req), req.params.id]
+    );
+
+    if (!message) throw ApiError.notFound('No message with that id.');
+    ok(res, message);
+  })
+);
+
 // --- numbers and contacts ---------------------------------------------------
 
 publicApiRouter.get(

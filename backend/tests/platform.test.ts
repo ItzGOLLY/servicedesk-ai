@@ -501,6 +501,30 @@ describe('Tenant console and API keys (integration)', () => {
     expect(response.status).toBe(403);
   });
 
+  it('retrieves a message by id, and only the caller\u2019s own', async () => {
+    await query(
+      `INSERT INTO whatsapp_messages (tenant_id, direction, provider_message_id, wa_number, body, status, provider)
+       VALUES ($1, 'OUTBOUND', 'wamid.MINE', '+919000000001', 'mine', 'SENT', 'meta'),
+              ($2, 'OUTBOUND', 'wamid.THEIRS', '+919000000002', 'theirs', 'SENT', 'meta')`,
+      [acme, globex]
+    );
+
+    const issued = await request(app)
+      .post('/api/platform/api-keys')
+      .set(auth(admin))
+      .send({ name: 'Production' });
+    const key = issued.body.data.key;
+
+    const mine = await request(app).get('/v1/messages/wamid.MINE').set('Authorization', `Bearer ${key}`);
+    expect(mine.status).toBe(200);
+    expect(mine.body.data.body).toBe('mine');
+
+    const theirs = await request(app)
+      .get('/v1/messages/wamid.THEIRS')
+      .set('Authorization', `Bearer ${key}`);
+    expect(theirs.status).toBe(404);
+  });
+
   it('refuses a WhatsApp account already connected to another tenant', async () => {
     await createConnectedNumber(globex, 'pn-globex', '+15550002222');
 
