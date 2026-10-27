@@ -252,7 +252,7 @@ Hand this table to your faculty. It is the "I have done the work" proof.
 | 19 | Per-customer isolation | `tenant_id` on every owned table | 10 tests |
 | 20 | WAAC / Messaging-account split tolerated | `waba_id` + `waac_id` columns | Schema |
 
-**32 platform tests, 193 total, all passing against a real PostgreSQL.**
+**53 platform tests, 214 total, all passing against a real PostgreSQL.**
 
 ---
 

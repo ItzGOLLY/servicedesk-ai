@@ -124,18 +124,43 @@ reference.
 
 Then type `STATUS` as the same number to show the keyword handling.
 
-### Step 6 — It is a platform, not just an app *(2 min)*
+### Step 6 — It is a platform, not just an app *(3 min)* ← **the new material**
 
-**Connect WhatsApp** → explain the Embedded Signup flow, then **Developers**.
+Sign out first. On the **public landing page**, point at *Connect your
+WhatsApp* — it is offered before any login, deliberately.
+
+1. **/signup** → fill in a business name, your name, an email, a password →
+   **Create workspace**. You land straight on Connect WhatsApp.
+2. Point out: this new workspace has **zero tickets**. It cannot see the demo
+   business's data at all.
+3. **Connect WhatsApp** → show the two routes: *Connect with Facebook*
+   (Embedded Signup) and *Connect manually*.
+4. **Need help?** → the setup guide. Scroll it. The webhook URL on that page is
+   rendered from the deployment's own configuration, not typed into the prose.
+5. Sign back in as admin → **Developers** → the issued API key and the webhook
+   endpoint.
 
 > *"Since the last review this became the platform underneath the support
-> desk. Other businesses connect their own WhatsApp number through Meta's
-> Embedded Signup. One webhook serves every business, routed by the phone
-> number the message arrived on — which is unique in our schema, so a routing
-> bug becomes a database error rather than one business reading another's
-> messages. We prove that with 32 tests."*
+> desk. A business signs itself up, gets its own workspace, and connects its
+> own WhatsApp number — through Meta's Embedded Signup, or with credentials it
+> already holds. One webhook serves every business, routed by the phone number
+> the message arrived on, which is unique platform-wide in our schema, so a
+> routing bug becomes a database error rather than one business reading
+> another's messages. 53 tests cover that layer."*
 
-Show the issued API key and the webhook endpoint.
+**If they ask what you learned, this is the answer to give:**
+
+> *"Building the self-signup is what exposed our worst defect. Multi-tenancy
+> scoped the writes and the message routing, but not the reads — so an admin of
+> any workspace could list every workspace's tickets, users, audit log and
+> dashboard figures. We found it the first time we signed up a second business
+> and it showed us the first one's tickets. We scoped twenty-nine queries
+> across seven modules and added ten tests, and we verified each fix by
+> reverting it and watching its own test fail. It was invisible with one
+> tenant — and public signup is exactly the feature that would have exposed
+> it in production."*
+
+That is in the report as Table 17.2.
 
 ### Step 7 — Evidence *(2 min)*
 
@@ -146,7 +171,7 @@ Show the issued API key and the webhook endpoint.
   the documentation cannot drift"*
 - GitHub → commit history, green CI badge
 
-> *"193 automated tests, run against a real PostgreSQL using the production
+> *"214 automated tests, run against a real PostgreSQL using the production
 > migration files — not mocks. A mock would accept data a CHECK constraint
 > rejects."*
 

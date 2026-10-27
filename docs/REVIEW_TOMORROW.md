@@ -139,7 +139,7 @@ inbound path without needing Meta.
 | **0:16** | Use the key | `curl .../v1/me -H "Authorization: Bearer sdk_..."` then the same call with a wrong key | "Scoped to their tenant. A wrong key, a revoked key, or a session cookie all get 401 — the public API is keys only, so a malicious page can't drive their messaging." |
 | **0:19** | Webhooks | Add an endpoint, show the signing secret and the delivery log | "Signed over timestamp plus body so a captured request can't be replayed, retried with backoff, then marked failed." |
 | **0:21** | **The helpdesk still works** | Agent window: open a ticket, AI panel → generate draft → send | "The original product is now one tenant's app on the platform. Nothing about it broke." |
-| **0:24** | Evidence | `npm test` output (193 passing) and `/api/docs` | "32 of these specifically test that one tenant cannot see another's data." |
+| **0:24** | Evidence | `npm test` output (214 passing) and `/api/docs` | "53 of these cover the platform layer, and ten of those specifically prove one tenant cannot read another's data — on every read path, not just the routing." |
 | **0:26** | **The honest bit** | Open `docs/META_INTEGRATION_HANDBOOK.md` §1 | See §4 below — say this carefully. |
 | **0:28** | GitHub | Repo, commit history, green CI | |
 | **0:29** | Questions | | |

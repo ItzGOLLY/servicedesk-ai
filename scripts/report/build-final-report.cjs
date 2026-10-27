@@ -162,7 +162,7 @@ c.push(p([i('Important: This report is a supporting document for project evaluat
 // ─── 1 Abstract ───────────────────────────────────────────────────────────────
 c.push(h1('1. Abstract'));
 c.push(p('A small business that receives customer complaints across WhatsApp, email and telephone has no reliable record of what was reported, who is handling it, or whether it was ever resolved. Commercial helpdesk products solve this but are priced per agent per month and assume a dedicated support team, placing them beyond a three-person business.'));
-c.push(p('ServiceDesk AI addresses this in two layers. The upper layer is a cloud-native Software-as-a-Service support desk: every complaint becomes a ticket with a reference, an owner, a category, a priority and a tracked status, visible to the customer, actionable by a support agent and measurable by an administrator. The lower layer — and the substantial addition since the mid-semester reviews — is a WhatsApp integration platform: other businesses connect their own WhatsApp Business numbers through Meta’s Embedded Signup, and the system routes, stores and serves each business’s messages in isolation. This is the model operated commercially by Twilio and AiSensy, and the support desk is simply the first application running on it.'));
+c.push(p('ServiceDesk AI addresses this in two layers. The upper layer is a cloud-native Software-as-a-Service support desk: every complaint becomes a ticket with a reference, an owner, a category, a priority and a tracked status, visible to the customer, actionable by a support agent and measurable by an administrator. The lower layer — and the substantial addition since the mid-semester reviews — is a WhatsApp integration platform: a business signs up from the public site, receives its own workspace, and connects its own WhatsApp Business number — either through Meta’s Embedded Signup or with credentials it already holds — after which the system routes, stores and serves each business’s messages in isolation. This is the model operated commercially by Twilio and AiSensy, and the support desk is simply the first application running on it.'));
 c.push(p('Three user roles are implemented — Customer, Support Agent and Administrator — with role-based access control enforced in the API rather than the interface. Major features include a guarded six-state ticket lifecycle, threaded conversations with staff-only internal notes, full-text search with filtering and pagination, persistent notifications, three role-specific dashboards, seven exportable reports, an administration module with an audit log, a two-way WhatsApp channel, an AI assistance layer that classifies and drafts but never messages a customer without agent approval, and a knowledge base answering questions from indexed articles using vector similarity search.'));
 c.push(p(`The application is deployed on public cloud infrastructure: the React frontend on Vercel's global CDN, the Express/TypeScript API on Render from a version-controlled Blueprint, and a managed PostgreSQL instance on Neon. Correctness is evidenced by ${CFG.testCount} automated tests executed against a real PostgreSQL database using the production migration files, all passing, and run by continuous integration on every push.`));
 c.push(p([b('Keywords: '), t('Cloud Computing, Software as a Service, Platform as a Service, Multi-Tenancy, Customer Support, Ticket Management, Role-Based Access Control, REST API, PostgreSQL, pgvector, React, Node.js, WhatsApp Business Platform, Embedded Signup, Retrieval-Augmented Generation, Graceful Degradation.')]));
@@ -225,7 +225,7 @@ c.push(caption('Table 4.1 — Existing approaches compared with the proposed sys
 // ─── 5 Proposed System ────────────────────────────────────────────────────────
 c.push(h1('5. Proposed System'));
 c.push(h2('5.1 Overview'));
-c.push(p('ServiceDesk AI is a multi-tenant, cloud-hosted SaaS application. Every complaint becomes a ticket carrying an owner, a category, a priority and a tracked status. The customer can see it on the web or by WhatsApp, the agent can act on it, and the administrator can measure it. Beneath that, the platform allows any onboarded business to attach its own WhatsApp Business number, with its data kept strictly separate from every other business on the deployment.'));
+c.push(p('ServiceDesk AI is a multi-tenant, cloud-hosted SaaS application. Every complaint becomes a ticket carrying an owner, a category, a priority and a tracked status. The customer can see it on the web or by WhatsApp, the agent can act on it, and the administrator can measure it. Beneath that, the platform allows any business to sign itself up and attach its own WhatsApp Business number, with its data kept strictly separate from every other business on the deployment — on the read paths as much as the write paths, which is where the isolation is easiest to get wrong and is recorded as a corrected defect in section 17.5.'));
 c.push(h2('5.2 Workflow'));
 c.push(...numbered([
   'A customer sends a WhatsApp message, or raises a ticket on the web. The ticket is stored immediately with status NEW and a reference such as SD-1024; on WhatsApp the customer receives an acknowledgement naming that reference within about a second.',
@@ -243,7 +243,7 @@ c.push(table(['Property', 'Realisation in this system'], [
   ['Edge-distributed presentation tier', 'The frontend is a static build cached by a content delivery network close to the user, and scales independently of the API.'],
   ['Infrastructure as code', 'render.yaml provisions the database and the API together, generates the JWT secrets and wires the connection string, so the deployment is a repeatable definition rather than a sequence of clicks.'],
   ['Continuous delivery', 'A push to the default branch runs the test suite and redeploys both tiers automatically.'],
-  ['Multi-tenancy', 'One deployment serves many businesses, each with isolated data and its own externally connected messaging number.'],
+  ['Multi-tenancy', 'One deployment serves many businesses, each signing itself up, each with its own externally connected messaging number, and each isolated by a tenant identifier carried on every table and applied to every query — reads included, which an inbound-routing design alone does not give you.'],
   ['Public reachability', 'The application is addressable from any browser on the internet and from any permitted WhatsApp number. There is no dependence on localhost.'],
 ], [2.6, 7.4]));
 c.push(caption('Table 5.1 — Cloud-native properties'));
@@ -306,7 +306,9 @@ c.push(caption('Table 7.1 — Functional requirements and their evidence'));
 c.push(h2('7.1 Additional capabilities implemented beyond the specification'));
 c.push(table(['Capability', 'Description'], [
   ['WhatsApp channel', 'Customers raise and follow tickets entirely from WhatsApp using the keywords HELP, STATUS, NEW and CLOSE; agent replies are delivered back to the same chat as plain text'],
-  ['Integration platform', 'Other businesses connect their own WhatsApp Business numbers through Meta’s Embedded Signup; one webhook serves every business, routed by the number the message arrived on'],
+  ['Integration platform', 'Other businesses connect their own WhatsApp Business numbers — either through Meta’s Embedded Signup, or by supplying credentials they already hold; one webhook serves every business, routed by the number the message arrived on'],
+  ['Business self-signup', 'A business signs up from the public site and receives its own workspace, with itself as administrator and its own ticket categories, created in a single transaction'],
+  ['In-application setup guide', 'A guide written for a business owner rather than a developer: which of the two connection routes applies, where each value Meta asks for actually sits in its dashboard, and what each common failure means. The webhook address is rendered from the deployment’s own configuration, so the instructions cannot drift from the running system'],
   ['Developer access', 'Each business can issue API keys and register webhook endpoints, receiving signed event deliveries with retry and backoff'],
   ['AI assistance', 'Classification of category, priority and sentiment; conversation summaries; suggested resolution steps; agent-reviewed draft replies — none of which reaches a customer without an agent sending it'],
   ['Knowledge base', 'Articles chunked, embedded and retrieved by vector similarity in PostgreSQL, answering questions with citations and reporting insufficiency rather than inventing an answer'],
@@ -415,7 +417,7 @@ c.push(table(['Module', 'Key capabilities'], [
   ['Reports and dashboards', 'Three role-specific dashboards, seven reports and CSV export, all computed from live data'],
   ['Administration', 'Categories, the audit log, the WhatsApp console and AI health'],
   ['WhatsApp channel', 'Signature-verified webhook, idempotent delivery handling, the conversation model and keyword commands, the plain-text formatter, provider adapters, and delivery of agent replies and status changes'],
-  ['Integration platform', 'Business onboarding through Embedded Signup, routing of one shared webhook to many businesses, API keys, and signed outbound webhooks with retry and backoff'],
+  ['Integration platform', 'Business self-signup and workspace creation; onboarding either through Embedded Signup or with credentials the business already holds; routing of one shared webhook to many businesses; API keys; signed outbound webhooks with retry and backoff; an in-application setup guide'],
   ['AI assistance', 'Classification after commit; draft replies, summaries and resolution steps; a provider adapter whose every failure converges on a rule-based fallback, with the outcome recorded'],
   ['Knowledge base', 'Article management, chunking, embedding, vector retrieval with a lexical fallback, and grounded answers whose citations are verified against the passages actually supplied'],
 ], [2.2, 7.8]));
@@ -426,18 +428,22 @@ c.push(h1('13. User Interface Design'));
 c.push(p('The interface is built on a hand-written design system rather than a component library: one accent colour, a neutral palette, consistent cards and tables, and explicit loading, empty and error states on every data view. It is responsive from 375 pixels, verified at phone, tablet and desktop widths. The screenshots below were captured from the deployed application at the live URL given in section 21, showing real data from the cloud database.'));
 
 const SHOT_LIST = [
-  ['02-login.png', 'Figure 13.1 — Sign in'],
-  ['04-customer-dashboard.png', 'Figure 13.2 — Customer dashboard, computed from live data'],
-  ['06-create-ticket.png', 'Figure 13.3 — Raising a ticket'],
-  ['08-agent-queue.png', 'Figure 13.4 — Agent queue with filters and full-text search'],
-  ['09-ticket-detail-ai.png', 'Figure 13.5 — Ticket detail with the conversation and the AI assistance panel'],
-  ['10-admin-dashboard.png', 'Figure 13.6 — Administrator dashboard'],
-  ['12-whatsapp-console.png', 'Figure 13.7 — WhatsApp console: provider status and message log'],
-  ['13-reports.png', 'Figure 13.8 — Reports with CSV export'],
-  ['11-admin-users.png', 'Figure 13.9 — User management'],
-  ['17-developers.png', 'Figure 13.10 — Developer console: an issued API key, whose \u201clast used\u201d timestamp records a successful call to the public API, and a registered webhook endpoint'],
-  ['15-mobile-queue.png', 'Figure 13.11 — Responsive layout at 390 pixels'],
-  ['14-swagger.png', 'Figure 13.12 — Interactive API documentation generated from the validation schemas'],
+  ['01-landing.png', 'Figure 13.1 — The public site. Connecting a WhatsApp number is offered before any sign-in, because that is what a prospective business comes for'],
+  ['18-business-signup.png', 'Figure 13.2 — Business self-signup: a new workspace and its first administrator'],
+  ['16-connect-whatsapp.png', 'Figure 13.3 — Connecting a number: Meta’s Embedded Signup for a business starting from nothing, or credentials a business already holds'],
+  ['19-setup-guide.png', 'Figure 13.4 — The in-application setup guide, with the deployment’s own webhook address and a plain-language account of the common failures'],
+  ['02-login.png', 'Figure 13.5 — Sign in'],
+  ['04-customer-dashboard.png', 'Figure 13.6 — Customer dashboard, computed from live data'],
+  ['06-create-ticket.png', 'Figure 13.7 — Raising a ticket'],
+  ['08-agent-queue.png', 'Figure 13.8 — Agent queue with filters and full-text search'],
+  ['09-ticket-detail-ai.png', 'Figure 13.9 — Ticket detail with the conversation and the AI assistance panel'],
+  ['10-admin-dashboard.png', 'Figure 13.10 — Administrator dashboard'],
+  ['12-whatsapp-console.png', 'Figure 13.11 — WhatsApp console: provider status and the message log, showing the customer’s number in full because an agent must be able to return the call'],
+  ['13-reports.png', 'Figure 13.12 — Reports with CSV export'],
+  ['11-admin-users.png', 'Figure 13.13 — User management'],
+  ['17-developers.png', 'Figure 13.14 — Developer console: an issued API key, whose \u201clast used\u201d timestamp records a successful call to the public API, and a registered webhook endpoint'],
+  ['15-mobile-queue.png', 'Figure 13.15 — Responsive layout at 390 pixels'],
+  ['14-swagger.png', 'Figure 13.16 — Interactive API documentation generated from the validation schemas'],
 ];
 for (const [f, cap] of SHOT_LIST) {
   c.push(img(f, f.startsWith('15-') ? 250 : 560));
@@ -459,7 +465,7 @@ c.push(table(['Layer', 'Technology', 'Reason'], [
 ], [1.4, 3.4, 5.2]));
 c.push(caption('Table 14.1 — Technology stack'));
 c.push(h2('14.2 API design'));
-c.push(p([t('Approximately sixty-four endpoints across eleven groups follow one convention: resource-oriented paths beneath '), mono('/api'), t(', JSON bodies validated by Zod, a single response envelope, HTTP status codes used precisely — 201 for creation, 400 for validation failure, 401 unauthenticated, 403 forbidden, 404 for absent or not-yours, 409 conflict, 422 for a business-rule violation and 429 for rate limiting — and pagination metadata on every list. The specification is served as OpenAPI 3 with an interactive Swagger interface.')]));
+c.push(p([t('Ninety-eight endpoints across fifteen route groups follow one convention: resource-oriented paths beneath '), mono('/api'), t(', JSON bodies validated by Zod, a single response envelope, HTTP status codes used precisely — 201 for creation, 400 for validation failure, 401 unauthenticated, 403 forbidden, 404 for absent or not-yours, 409 conflict, 422 for a business-rule violation and 429 for rate limiting — and pagination metadata on every list. The specification is served as OpenAPI 3 with an interactive Swagger interface.')]));
 c.push(h2('14.3 Security implementation'));
 c.push(...bullets([
   'Passwords are hashed with bcrypt at cost 12. The hash is never logged, and the login response is identical for an unknown email and a wrong password, so accounts cannot be enumerated.',
@@ -499,7 +505,7 @@ c.push(table(['Area', 'Cases', 'What is proven'], [
   ['Lifecycle and AI', '20', 'The transition table; classification after commit; fallback on timeout, network error and malformed output; the fallback flag persisted; drafts never sent automatically; resistance to an instruction embedded in a ticket'],
   ['Knowledge base', '31', 'Chunking, indexing within a transaction, vector retrieval, lexical fallback, citation verification, the insufficiency flag, and the vector-index regression'],
   ['WhatsApp channel', '38', 'Plain-text formatting, number normalisation, provider payload parsing and signature verification, the whole inbound flow including replay suppression and every keyword, outbound delivery of replies and status changes, and masking in the administrative log'],
-  ['Integration platform', '32', 'Tenant isolation, credential encryption, API-key authentication and revocation, webhook signing, retry with backoff, and account-status handling'],
+  ['Integration platform', '53', 'Tenant isolation across every read path, credential encryption, API-key authentication and revocation, webhook signing, retry with backoff, account-status handling, business self-signup and workspace creation, and manual number connection'],
 ], [2.3, 0.8, 6.9]));
 c.push(caption('Table 15.1 — Automated test coverage'));
 c.push(h2('15.4 Representative test cases'));
@@ -516,6 +522,13 @@ c.push(table(['Test', 'Expected', 'Result'], [
   ['Send an unsigned webhook', '403, nothing created', 'Pass'],
   ['One business lists another’s API keys', 'Nothing returned', 'Pass'],
   ['Call the public API with a session cookie', '401 — API keys only', 'Pass'],
+  ['A newly signed-up workspace lists its tickets', 'Sees none of another business’s', 'Pass'],
+  ['It requests another workspace’s ticket by identifier', '404, so existence is not disclosed', 'Pass'],
+  ['It reads its dashboard and reports', 'Counts and totals of its own data only', 'Pass'],
+  ['Knowledge-base retrieval in an empty workspace', 'Returns nothing belonging to another business', 'Pass'],
+  ['Two businesses sign up under the same name', 'Distinct workspace identifiers', 'Pass'],
+  ['Signup fails on a duplicate email address', 'No workspace left behind without an administrator', 'Pass'],
+  ['Connect a number with an invalid access token', 'Refused before anything is stored, with the reason named', 'Pass'],
 ], [5.2, 3.2, 1.6]));
 c.push(caption('Table 15.2 — Representative test cases and results'));
 c.push(h2('15.5 Manual verification'));
@@ -577,7 +590,15 @@ c.push(table(['Measure', 'Result'], [
 c.push(caption('Table 17.1 — Measured outcomes'));
 c.push(h2('17.4 Discussion'));
 c.push(p('Two decisions proved most valuable. Defining the infrastructure in a version-controlled file turned a failed first deployment into a one-line correction and a re-apply. Placing every external dependency behind an adapter with an offline implementation meant that when the first messaging provider’s trial tier turned out to refuse free-form replies, switching providers touched one new file and no existing behaviour. The tests, because they run against a real database rather than mocks, caught a vector-index defect that would otherwise have shipped silently.'));
-c.push(h2('17.5 Limitations'));
+c.push(h2('17.5 Defects found and corrected'));
+c.push(p('Three defects are recorded here because finding them was part of the work, and because each was found by a different means.'));
+c.push(table(['Defect', 'How it surfaced', 'Correction'], [
+  ['Vector retrieval silently returned fewer results than it should on a sparsely populated table', 'An automated test that runs against a real database rather than a mock', 'The approximate index was replaced with one whose recall does not collapse at small table sizes, and the test was kept as a regression'],
+  ['Multi-tenancy scoped the writes and the message routing, but not the reads. An administrator of any workspace could list every workspace’s tickets, users, categories, audit entries, dashboard figures and reports, and knowledge-base retrieval searched across all businesses', 'Exercising the new business self-signup end to end: a workspace created seconds earlier displayed another business’s tickets', 'Twenty-nine queries across seven modules were scoped by tenant, and ten tests added. Each fix was confirmed by reverting it and watching its own test fail. The defect was invisible in production only because a single workspace existed — and public signup is precisely the feature that would have exposed it'],
+  ['The message log masked customer numbers to their last four digits', 'Reviewing the console against what a support agent actually needs to do', 'The number belongs to the tenant’s own customer and an agent must be able to return the call, so it is shown in full and made actionable. Masking was retained in server logs, which leave the tenant’s boundary'],
+], [3.2, 2.6, 4.2]));
+c.push(caption('Table 17.2 — Defects found and corrected'));
+c.push(h2('17.6 Limitations'));
 c.push(p('Stated plainly rather than omitted:'));
 c.push(...bullets([
   'File attachments and cloud object storage are not implemented, so the optional cloud-storage clause of the specification is not satisfied.',
@@ -585,7 +606,7 @@ c.push(...bullets([
   'The frontend has no automated tests; it was verified manually across all three roles and three viewport widths.',
   'The live language-model path is not exercised by the automated suite, because that would require a network call and a credential and would make the suite non-deterministic. Its failure handling is tested by forcing failures.',
   'Commercial approval to onboard businesses unconnected to the project has not been obtained, as the provider requires verification of a registered company. The integration is complete and demonstrable with permitted test accounts.',
-  'The free database tier expires after thirty days and the free application instance sleeps when idle; both are limitations of the hosting tier rather than of the application.',
+  'The free application instance sleeps when idle and takes roughly thirty seconds to serve its first request after waking; subsequent requests are served in well under a second. This is a property of the free hosting tier, not of the application. The database plan, after the move described in section 16, does not expire.',
 ]));
 
 // ─── 18 Future Enhancements ───────────────────────────────────────────────────
@@ -649,7 +670,7 @@ c.push(kv([
   ['Support Agent Login', CFG.agentUser],
   ['Support Agent Password', CFG.agentPassword],
 ]));
-c.push(p([b('Suggested evaluation path: '), t('sign in as the administrator to see the dashboards, reports, user management and the WhatsApp console; sign in as the support agent to see the prioritised queue and the AI assistance panel on a ticket; sign in as the test customer, or register a new account, to raise a ticket and watch it classified automatically.')], { spacing: { before: 150 } }));
+c.push(p([b('Suggested evaluation path: '), t('sign in as the administrator to see the dashboards, reports, user management and the WhatsApp console; sign in as the support agent to see the prioritised queue and the AI assistance panel on a ticket; sign in as the test customer, or register a new account, to raise a ticket and watch it classified automatically. To evaluate the platform layer rather than the application, follow “Connect your WhatsApp” from the landing page and create a workspace of your own: it begins empty, proving the isolation, and its Connect screen offers both onboarding routes together with the setup guide.')], { spacing: { before: 150 } }));
 c.push(p([i('Credentials provided here are demonstration accounts only. They are not personal passwords and are unrelated to any other account.', { size: 18, color: MUTED })]));
 
 // ─── Checklist and declaration ────────────────────────────────────────────────
