@@ -24,8 +24,12 @@ auditRouter.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { action, entityType, page, limit } = req.query as never as z.infer<typeof listSchema>;
 
-    const clauses: string[] = [];
-    const params: unknown[] = [];
+    // audit_logs has no tenant column of its own — an entry is attributed to
+    // the actor who performed it — so it is scoped through that actor. Entries
+    // whose actor has since been deleted (actor_id is nulled) are therefore
+    // not listed; they remain in the table for forensic purposes.
+    const params: unknown[] = [req.user!.tenantId];
+    const clauses: string[] = ['u.tenant_id = $1'];
     if (action) {
       params.push(action);
       clauses.push(`a.action = $${params.length}`);
@@ -34,10 +38,11 @@ auditRouter.get(
       params.push(entityType);
       clauses.push(`a.entity_type = $${params.length}`);
     }
-    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const where = `WHERE ${clauses.join(' AND ')}`;
 
     const totals = await query<{ count: string }>(
-      `SELECT COUNT(*)::TEXT AS count FROM audit_logs a ${where}`,
+      `SELECT COUNT(*)::TEXT AS count
+         FROM audit_logs a JOIN users u ON u.id = a.actor_id ${where}`,
       params
     );
 
@@ -55,7 +60,7 @@ auditRouter.get(
       `SELECT a.id, a.action, a.entity_type, a.entity_id, a.metadata, a.ip_address, a.created_at,
               u.full_name AS actor_name, u.email AS actor_email
          FROM audit_logs a
-         LEFT JOIN users u ON u.id = a.actor_id
+         JOIN users u ON u.id = a.actor_id
          ${where}
         ORDER BY a.created_at DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,

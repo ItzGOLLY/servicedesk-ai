@@ -145,7 +145,7 @@ aiRouter.post(
     // The whole ticket is the query: subject alone is often too terse to
     // retrieve well, and the description carries the specific symptoms.
     const queryText = `${context.subject}\n\n${context.description}`;
-    const retrieval = await retrieve(queryText, 4);
+    const retrieval = await retrieve(queryText, req.user!.tenantId, 4);
     await recordRetrieval(req.params.id, queryText, retrieval);
 
     const outcome = await answerFromKnowledge(

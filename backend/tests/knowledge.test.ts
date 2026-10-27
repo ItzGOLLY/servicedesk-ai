@@ -8,6 +8,7 @@ import {
   migrateTestDatabase,
   resetDatabase,
   type TestUser,
+  defaultTenantId,
 } from './helpers';
 import { closePool, query } from '../src/db/pool';
 import { chunkArticle, indexArticle, retrieve } from '../src/modules/knowledge/knowledge.service';
@@ -136,7 +137,7 @@ describe('Knowledge base and retrieval (integration)', () => {
     await createArticle(REFUND_ARTICLE);
     await createArticle(CRASH_ARTICLE);
 
-    const outcome = await retrieve('my refund has not arrived after two weeks', 3);
+    const outcome = await retrieve('my refund has not arrived after two weeks', await defaultTenantId(), 3);
 
     expect(outcome.chunks.length).toBeGreaterThan(0);
     expect(outcome.chunks[0].articleTitle).toContain('Refund');
@@ -146,7 +147,7 @@ describe('Knowledge base and retrieval (integration)', () => {
     await createArticle(REFUND_ARTICLE);
     await createArticle(CRASH_ARTICLE);
 
-    const outcome = await retrieve('the app crashes on the checkout screen', 3);
+    const outcome = await retrieve('the app crashes on the checkout screen', await defaultTenantId(), 3);
     expect(outcome.chunks[0].articleTitle).toContain('crashes');
   });
 
@@ -179,7 +180,7 @@ describe('Knowledge base and retrieval (integration)', () => {
       .set(auth(admin))
       .send({ isPublished: false });
 
-    const outcome = await retrieve('refund has not arrived', 3);
+    const outcome = await retrieve('refund has not arrived', await defaultTenantId(), 3);
     expect(outcome.chunks).toHaveLength(0);
   });
 
@@ -194,7 +195,7 @@ describe('Knowledge base and retrieval (integration)', () => {
   });
 
   it('returns no results rather than failing when the base is empty', async () => {
-    const outcome = await retrieve('anything at all', 3);
+    const outcome = await retrieve('anything at all', await defaultTenantId(), 3);
     expect(outcome.chunks).toEqual([]);
   });
 
@@ -292,7 +293,7 @@ describe('Knowledge base and retrieval (integration)', () => {
 
   it('reports vector search as NOT a lexical fallback, even on the offline embedder', async () => {
     await createArticle();
-    const outcome = await retrieve('refund has not arrived', 3);
+    const outcome = await retrieve('refund has not arrived', await defaultTenantId(), 3);
 
     // Vector search ran (chunks are embedded), so this must be false. The bug
     // being pinned here set it from the embedder's own fallback flag.
@@ -306,7 +307,7 @@ describe('Knowledge base and retrieval (integration)', () => {
     const created = await createArticle();
     await query('UPDATE kb_chunks SET embedding = NULL WHERE article_id = $1', [created.body.data.id]);
 
-    const outcome = await retrieve('refund working days', 3);
+    const outcome = await retrieve('refund working days', await defaultTenantId(), 3);
     expect(outcome.usedLexicalFallback).toBe(true);
     expect(outcome.model).toBe('postgres-fts');
   });

@@ -17,9 +17,11 @@ const shape = (rows: { label: string; count: string }[]) =>
 
 reportsRouter.get(
   '/tickets-by-status',
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const rows = await query<{ label: string; count: string }>(
-      `SELECT status::TEXT AS label, COUNT(*)::TEXT AS count FROM tickets GROUP BY status ORDER BY status`
+      `SELECT status::TEXT AS label, COUNT(*)::TEXT AS count
+         FROM tickets WHERE tenant_id = $1 GROUP BY status ORDER BY status`,
+      [req.user!.tenantId]
     );
     ok(res, shape(rows));
   })
@@ -27,9 +29,11 @@ reportsRouter.get(
 
 reportsRouter.get(
   '/tickets-by-priority',
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const rows = await query<{ label: string; count: string }>(
-      `SELECT priority::TEXT AS label, COUNT(*)::TEXT AS count FROM tickets GROUP BY priority ORDER BY priority`
+      `SELECT priority::TEXT AS label, COUNT(*)::TEXT AS count
+         FROM tickets WHERE tenant_id = $1 GROUP BY priority ORDER BY priority`,
+      [req.user!.tenantId]
     );
     ok(res, shape(rows));
   })
@@ -37,11 +41,13 @@ reportsRouter.get(
 
 reportsRouter.get(
   '/tickets-by-category',
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const rows = await query<{ label: string; count: string }>(
       `SELECT COALESCE(c.name, 'Uncategorised') AS label, COUNT(*)::TEXT AS count
          FROM tickets t LEFT JOIN categories c ON c.id = t.category_id
-        GROUP BY c.name ORDER BY COUNT(*) DESC`
+        WHERE t.tenant_id = $1
+        GROUP BY c.name ORDER BY COUNT(*) DESC`,
+      [req.user!.tenantId]
     );
     ok(res, shape(rows));
   })
@@ -49,10 +55,11 @@ reportsRouter.get(
 
 reportsRouter.get(
   '/sentiment',
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const rows = await query<{ label: string; count: string }>(
       `SELECT COALESCE(sentiment::TEXT, 'UNCLASSIFIED') AS label, COUNT(*)::TEXT AS count
-         FROM tickets GROUP BY sentiment ORDER BY COUNT(*) DESC`
+         FROM tickets WHERE tenant_id = $1 GROUP BY sentiment ORDER BY COUNT(*) DESC`,
+      [req.user!.tenantId]
     );
     ok(res, shape(rows));
   })
@@ -60,7 +67,7 @@ reportsRouter.get(
 
 reportsRouter.get(
   '/agent-workload',
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const rows = await query<{
       name: string;
       email: string;
@@ -72,10 +79,12 @@ reportsRouter.get(
               COUNT(t.id) FILTER (WHERE t.status NOT IN ('RESOLVED','CLOSED'))::TEXT AS open,
               COUNT(t.id) FILTER (WHERE t.status IN ('RESOLVED','CLOSED'))::TEXT AS resolved,
               ROUND(AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 3600)::NUMERIC, 1)::TEXT AS avg_hours
-         FROM users u LEFT JOIN tickets t ON t.assigned_agent_id = u.id
-        WHERE u.role IN ('AGENT','ADMIN') AND u.is_active
+         FROM users u LEFT JOIN tickets t
+           ON t.assigned_agent_id = u.id AND t.tenant_id = $1
+        WHERE u.tenant_id = $1 AND u.role IN ('AGENT','ADMIN') AND u.is_active
         GROUP BY u.id, u.full_name, u.email
-        ORDER BY COUNT(t.id) DESC`
+        ORDER BY COUNT(t.id) DESC`,
+      [req.user!.tenantId]
     );
 
     ok(
@@ -101,10 +110,10 @@ reportsRouter.get(
               COUNT(c.id)::TEXT AS created,
               COUNT(r.id)::TEXT AS resolved
          FROM generate_series(CURRENT_DATE - ($1::INT - 1) * INTERVAL '1 day', CURRENT_DATE, '1 day') AS d(day)
-         LEFT JOIN tickets c ON DATE(c.created_at) = d.day
-         LEFT JOIN tickets r ON DATE(r.resolved_at) = d.day
+         LEFT JOIN tickets c ON DATE(c.created_at) = d.day AND c.tenant_id = $2
+         LEFT JOIN tickets r ON DATE(r.resolved_at) = d.day AND r.tenant_id = $2
         GROUP BY d.day ORDER BY d.day`,
-      [days]
+      [days, req.user!.tenantId]
     );
 
     ok(
@@ -116,7 +125,7 @@ reportsRouter.get(
 
 reportsRouter.get(
   '/resolution-time',
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const rows = await query<{
       label: string;
       avg_hours: string | null;
@@ -126,8 +135,9 @@ reportsRouter.get(
               ROUND(AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 3600)::NUMERIC, 1)::TEXT AS avg_hours,
               COUNT(t.id)::TEXT AS resolved
          FROM tickets t LEFT JOIN categories c ON c.id = t.category_id
-        WHERE t.resolved_at IS NOT NULL
-        GROUP BY c.name ORDER BY AVG(t.resolved_at - t.created_at) DESC`
+        WHERE t.tenant_id = $1 AND t.resolved_at IS NOT NULL
+        GROUP BY c.name ORDER BY AVG(t.resolved_at - t.created_at) DESC`,
+      [req.user!.tenantId]
     );
 
     ok(
@@ -161,7 +171,7 @@ function toCsv(headers: string[], rows: (string | number | null)[][]): string {
 reportsRouter.get(
   '/export',
   validate(z.object({ format: z.enum(['csv']).default('csv') }), 'query'),
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const rows = await query<{
       reference: string;
       subject: string;
@@ -181,7 +191,9 @@ reportsRouter.get(
          JOIN users cu ON cu.id = t.customer_id
          LEFT JOIN users ag ON ag.id = t.assigned_agent_id
          LEFT JOIN categories c ON c.id = t.category_id
-        ORDER BY t.created_at DESC`
+        WHERE t.tenant_id = $1
+        ORDER BY t.created_at DESC`,
+      [req.user!.tenantId]
     );
 
     const csv = toCsv(

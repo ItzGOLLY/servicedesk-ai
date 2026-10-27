@@ -59,11 +59,12 @@ knowledgeRouter.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { q, page, limit } = req.query as never as { q?: string; page: number; limit: number };
 
-    const params: unknown[] = [];
-    let where = '';
+    // Seeded with the tenant so the search filter cannot widen the scope.
+    const params: unknown[] = [req.user!.tenantId];
+    let where = 'WHERE a.tenant_id = $1';
     if (q) {
       params.push(`%${q}%`);
-      where = `WHERE a.title ILIKE $${params.length} OR a.body ILIKE $${params.length}`;
+      where += ` AND (a.title ILIKE $${params.length} OR a.body ILIKE $${params.length})`;
     }
 
     const totals = await query<{ count: string }>(
@@ -129,8 +130,8 @@ knowledgeRouter.get(
               a.created_at, a.updated_at,
               (SELECT COUNT(*)::TEXT FROM kb_chunks k WHERE k.article_id = a.id) AS chunk_count
          FROM kb_articles a LEFT JOIN categories c ON c.id = a.category_id
-        WHERE a.id = $1`,
-      [req.params.id]
+        WHERE a.id = $1 AND a.tenant_id = $2`,
+      [req.params.id, req.user!.tenantId]
     );
     if (!article) throw ApiError.notFound('Article not found.');
     ok(res, toDto(article));
@@ -151,7 +152,7 @@ knowledgeRouter.patch(
               body = COALESCE($2, body),
               category_id = CASE WHEN $3::BOOLEAN THEN $4::UUID ELSE category_id END,
               is_published = COALESCE($5, is_published)
-        WHERE id = $6
+        WHERE id = $6 AND tenant_id = $7
         RETURNING id, title, body, is_published, category_id, NULL::TEXT AS category_name,
                   created_at, updated_at`,
       [
@@ -161,6 +162,7 @@ knowledgeRouter.patch(
         categoryId ?? null,
         isPublished ?? null,
         req.params.id,
+        req.user!.tenantId,
       ]
     );
     if (!article) throw ApiError.notFound('Article not found.');
@@ -181,8 +183,8 @@ knowledgeRouter.delete(
   requireRole('ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
     const article = await queryOne<{ id: string; title: string }>(
-      'SELECT id, title FROM kb_articles WHERE id = $1',
-      [req.params.id]
+      'SELECT id, title FROM kb_articles WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, req.user!.tenantId]
     );
     if (!article) throw ApiError.notFound('Article not found.');
 
@@ -197,7 +199,10 @@ knowledgeRouter.post(
   `/:id${UUID}/reindex`,
   requireRole('ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
-    const exists = await queryOne('SELECT id FROM kb_articles WHERE id = $1', [req.params.id]);
+    const exists = await queryOne(
+      'SELECT id FROM kb_articles WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, req.user!.tenantId]
+    );
     if (!exists) throw ApiError.notFound('Article not found.');
 
     const indexed = await indexArticle(req.params.id);
@@ -218,7 +223,7 @@ knowledgeRouter.post(
   ),
   asyncHandler(async (req: Request, res: Response) => {
     const { query: queryText, limit } = req.body;
-    const outcome = await retrieve(queryText, limit ?? 4);
+    const outcome = await retrieve(queryText, req.user!.tenantId, limit ?? 4);
     await recordRetrieval(null, queryText, outcome);
 
     ok(res, {

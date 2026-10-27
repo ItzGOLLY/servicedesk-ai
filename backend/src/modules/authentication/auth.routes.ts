@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { query, queryOne } from '../../db/pool';
+import { z } from 'zod';
+import { query, queryOne, withTransaction } from '../../db/pool';
 import { validate } from '../../middleware/validate';
 import { requireAuth } from '../../middleware/auth';
 import { ApiError } from '../../utils/ApiError';
@@ -113,6 +114,113 @@ authRouter.post(
     await recordAudit(req, 'USER_REGISTERED', 'user', user.id, { email });
 
     created(res, { user: publicUser(user), accessToken });
+  })
+);
+
+/**
+ * Derives a URL-safe workspace slug from a business name.
+ *
+ * Must satisfy the CHECK on tenants.slug: 3–40 characters, starting and
+ * ending alphanumeric. A name that reduces to nothing (punctuation only, or
+ * a non-Latin script) falls back to a generic stem rather than failing the
+ * signup, because the slug is an implementation detail the business never
+ * chose and should not be blocked by.
+ */
+function slugify(name: string): string {
+  const base = name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32)
+    .replace(/-+$/g, '');
+
+  return base.length >= 3 ? base : 'workspace';
+}
+
+/** Appends a counter until the slug is free. */
+async function uniqueSlug(base: string): Promise<string> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const candidate = attempt === 0 ? base : `${base.slice(0, 32)}-${attempt + 1}`;
+    const taken = await queryOne('SELECT id FROM tenants WHERE slug = $1', [candidate]);
+    if (!taken) return candidate;
+  }
+  // Astronomically unlikely; still better than looping forever.
+  return `workspace-${Date.now().toString(36)}`;
+}
+
+const registerBusinessSchema = z.object({
+  businessName: z.string().trim().min(2, 'Enter your business name.').max(120),
+  fullName: z.string().trim().min(2, 'Enter your name.').max(120),
+  email: z.string().trim().toLowerCase().email('Enter a valid email address.'),
+  password: z
+    .string()
+    .min(8, 'Use at least 8 characters.')
+    .regex(/[A-Za-z]/, 'Include at least one letter.')
+    .regex(/\d/, 'Include at least one digit.'),
+});
+
+/**
+ * POST /api/auth/register-business — public.
+ *
+ * Creates a NEW workspace and makes the person who signed up its
+ * administrator. This is what distinguishes the platform from the
+ * application: /register adds a customer to an existing business, while this
+ * onboards a business itself, which can then connect its own WhatsApp number
+ * and issue its own API keys.
+ *
+ * The workspace and its first user are created in one transaction, because a
+ * workspace with no administrator cannot be administered, and an admin
+ * attached to no workspace cannot be scoped.
+ */
+authRouter.post(
+  '/register-business',
+  authLimiter,
+  validate(registerBusinessSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { businessName, fullName, email, password } = req.body;
+
+    const existing = await queryOne('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing) {
+      throw ApiError.conflict('An account with this email address already exists.');
+    }
+
+    const passwordHash = await hashPassword(password);
+    const slug = await uniqueSlug(slugify(businessName));
+
+    const user = await withTransaction(async (client) => {
+      const tenant = await client.query<{ id: string }>(
+        `INSERT INTO tenants (name, slug, contact_email) VALUES ($1, $2, $3) RETURNING id`,
+        [businessName, slug, email]
+      );
+
+      const created = await client.query<UserRow>(
+        `INSERT INTO users (tenant_id, email, password_hash, full_name, role)
+         VALUES ($1, $2, $3, $4, 'ADMIN')
+         RETURNING id, email, full_name, role, phone, is_active, created_at`,
+        [tenant.rows[0].id, email, passwordHash, fullName]
+      );
+
+      // Without a category the classifier has no vocabulary to choose from,
+      // so a new workspace starts with the same defaults as the seed.
+      for (const category of ['Billing', 'Technical', 'Delivery', 'Account', 'General']) {
+        await client.query(
+          'INSERT INTO categories (tenant_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [tenant.rows[0].id, category]
+        );
+      }
+
+      return created.rows[0];
+    });
+
+    if (!user) throw ApiError.internal('Could not create the workspace.');
+
+    const accessToken = signAccessToken({ sub: user.id, role: user.role, email: user.email });
+    setRefreshCookie(res, signRefreshToken(user.id));
+
+    await recordAudit(req, 'WORKSPACE_CREATED', 'tenant', null, { slug, businessName });
+
+    created(res, { user: publicUser(user), accessToken, workspace: { slug, name: businessName } });
   })
 );
 
