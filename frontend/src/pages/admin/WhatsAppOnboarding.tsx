@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Card, PageHeader, Badge, LoadingBlock, ErrorNotice, EmptyState } from '../../components/ui';
@@ -301,10 +302,18 @@ export default function WhatsAppOnboarding() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Connect WhatsApp"
-        subtitle="Onboard a WhatsApp Business number through Meta. Messages to it arrive here within seconds."
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader
+          title="Connect WhatsApp"
+          subtitle="Onboard a WhatsApp Business number through Meta. Messages to it arrive here within seconds."
+        />
+        <Link
+          to="/admin/connect/help"
+          className="btn-secondary shrink-0 whitespace-nowrap px-4 py-2 text-sm"
+        >
+          Need help?
+        </Link>
+      </div>
 
       {notice && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">

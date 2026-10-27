@@ -19,6 +19,7 @@ import ActivityLog from './pages/admin/ActivityLog';
 import WhatsAppConsole from './pages/admin/WhatsAppConsole';
 import WhatsAppOnboarding from './pages/admin/WhatsAppOnboarding';
 import Developer from './pages/admin/Developer';
+import ConnectHelp from './pages/admin/ConnectHelp';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import type { UserRole } from './lib/types';
@@ -153,6 +154,7 @@ export default function App() {
           <Route path="/admin/categories" element={<CategoryManagement />} />
           <Route path="/admin/whatsapp" element={<WhatsAppConsole />} />
           <Route path="/admin/connect" element={<WhatsAppOnboarding />} />
+          <Route path="/admin/connect/help" element={<ConnectHelp />} />
           <Route path="/admin/developers" element={<Developer />} />
           <Route path="/admin/reports" element={<Reports />} />
           <Route path="/admin/activity" element={<ActivityLog />} />
