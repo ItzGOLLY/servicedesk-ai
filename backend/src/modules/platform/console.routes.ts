@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import { env } from '../../config/env';
+import { env, isProduction } from '../../config/env';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validate } from '../../middleware/validate';
@@ -153,6 +153,65 @@ platformConsoleRouter.post(
       // The Graph failure is translated into something actionable rather than
       // surfacing "Permissions error" to a user who cannot act on it.
       throw new ApiError(502, 'ONBOARDING_FAILED', onboarding.describeFailure(error));
+    }
+  })
+);
+
+/**
+ * POST /platform/connections/manual
+ *
+ * Connects a number the business already owns, using credentials they hold.
+ * The alternative to Embedded Signup, for a business migrating from another
+ * provider or one that set WhatsApp up themselves — and the path that works
+ * before this deployment has Embedded Signup configured.
+ */
+platformConsoleRouter.post(
+  '/connections/manual',
+  validate(
+    z.object({
+      waba_id: z.string().trim().regex(/^\d{5,}$/, 'The WhatsApp Business Account ID is all digits.'),
+      phone_number_id: z.string().trim().regex(/^\d{5,}$/, 'The phone number ID is all digits.'),
+      access_token: z.string().trim().min(20, 'That does not look like a Meta access token.'),
+    })
+  ),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { waba_id: wabaId, phone_number_id: phoneNumberId, access_token: accessToken } = req.body;
+
+    const existing = await queryOne<{ tenant_id: string }>(
+      'SELECT tenant_id FROM wa_connections WHERE waba_id = $1',
+      [wabaId]
+    );
+    if (existing && existing.tenant_id !== tenantId(req)) {
+      throw ApiError.conflict('This WhatsApp account is already connected to another workspace.');
+    }
+
+    if (!env.platformEncryptionKey && isProduction) {
+      throw new ApiError(
+        503,
+        'NOT_CONFIGURED',
+        'This deployment has no PLATFORM_ENCRYPTION_KEY, so an access token cannot be stored safely.'
+      );
+    }
+
+    try {
+      const result = await onboarding.connectManually({
+        tenantId: tenantId(req),
+        wabaId,
+        phoneNumberId,
+        accessToken,
+        onboardedBy: req.user!.id,
+      });
+
+      // The token itself is never echoed back, and the audit entry records
+      // only that a connection happened.
+      await recordAudit(req, 'WHATSAPP_CONNECTED', 'wa_connection', result.connectionId, {
+        waba_id: wabaId,
+        method: 'manual',
+      });
+
+      created(res, result);
+    } catch (error) {
+      throw new ApiError(502, 'CONNECT_FAILED', (error as Error).message);
     }
   })
 );

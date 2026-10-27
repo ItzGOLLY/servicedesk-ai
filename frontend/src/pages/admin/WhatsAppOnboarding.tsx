@@ -76,6 +76,8 @@ export default function WhatsAppOnboarding() {
   const [launching, setLaunching] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manual, setManual] = useState({ waba_id: '', phone_number_id: '', access_token: '' });
 
   // Meta posts the result as a window message rather than returning it from
   // FB.login, so the two have to be correlated: the message carries the ids,
@@ -111,6 +113,28 @@ export default function WhatsAppOnboarding() {
           : 'WhatsApp account connected. Messages to this number now arrive here.'
       );
       setFailure(null);
+      void queryClient.invalidateQueries({ queryKey: ['wa-connections'] });
+      void queryClient.invalidateQueries({ queryKey: ['wa-numbers'] });
+    },
+    onError: (error: Error) => {
+      setFailure(error.message);
+      setNotice(null);
+    },
+  });
+
+  const connectManually = useMutation({
+    mutationFn: (payload: { waba_id: string; phone_number_id: string; access_token: string }) =>
+      api.post<{ numbers: unknown[]; warnings: string[] }>('/platform/connections/manual', payload),
+    onSuccess: (response) => {
+      const warnings = response.data.warnings ?? [];
+      setNotice(
+        warnings.length
+          ? `Connected, with notes: ${warnings.join(' ')}`
+          : 'Number connected. Messages sent to it will arrive here within seconds.'
+      );
+      setFailure(null);
+      setManualOpen(false);
+      setManual({ waba_id: '', phone_number_id: '', access_token: '' });
       void queryClient.invalidateQueries({ queryKey: ['wa-connections'] });
       void queryClient.invalidateQueries({ queryKey: ['wa-numbers'] });
     },
@@ -301,8 +325,7 @@ export default function WhatsAppOnboarding() {
                 <code className="rounded bg-slate-100 px-1">META_ES_CONFIG_ID</code>.
               </p>
               <p className="text-sm text-slate-600">
-                Until then, numbers can still be connected manually and everything else on this
-                page works.
+                You can still connect a number you already own, using the form below.
               </p>
             </div>
           ) : (
@@ -328,6 +351,111 @@ export default function WhatsAppOnboarding() {
                     : 'Loading Meta SDK…'}
               </button>
             </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Connect a number the business already owns. Works whether or not
+          Embedded Signup is configured on this deployment. */}
+      <Card>
+        <div className="p-5">
+          <button
+            type="button"
+            onClick={() => setManualOpen((open) => !open)}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <span>
+              <span className="font-semibold text-slate-900">
+                Already have a WhatsApp Business number?
+              </span>
+              <span className="mt-1 block text-sm text-slate-600">
+                Connect it with credentials from Meta instead of going through the dialog.
+              </span>
+            </span>
+            <span className="ml-4 shrink-0 text-sm font-medium text-teal-700">
+              {manualOpen ? 'Hide' : 'Connect manually'}
+            </span>
+          </button>
+
+          {manualOpen && (
+            <form
+              className="mt-5 space-y-4 border-t border-slate-200 pt-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                connectManually.mutate(manual);
+              }}
+            >
+              <p className="text-sm text-slate-600">
+                Find these in{' '}
+                <a
+                  href="https://developers.facebook.com/apps"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-teal-700 underline"
+                >
+                  Meta for Developers
+                </a>{' '}
+                under <strong>WhatsApp &rarr; API Setup</strong>.
+              </p>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-800">
+                    WhatsApp Business Account ID
+                  </span>
+                  <input
+                    value={manual.waba_id}
+                    onChange={(e) => setManual({ ...manual, waba_id: e.target.value.trim() })}
+                    placeholder="1101933506155292"
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm"
+                    required
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-800">Phone number ID</span>
+                  <input
+                    value={manual.phone_number_id}
+                    onChange={(e) =>
+                      setManual({ ...manual, phone_number_id: e.target.value.trim() })
+                    }
+                    placeholder="1298719266663870"
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm"
+                    required
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="text-sm font-medium text-slate-800">Access token</span>
+                <textarea
+                  value={manual.access_token}
+                  onChange={(e) => setManual({ ...manual, access_token: e.target.value.trim() })}
+                  placeholder="EAAG..."
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
+                  required
+                />
+                <span className="mt-1 block text-xs text-slate-500">
+                  Stored encrypted, never shown again, and never sent to your browser after this.
+                  A token generated in the API Setup panel expires after 24 hours; a System User
+                  token does not.
+                </span>
+              </label>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={connectManually.isPending}
+                  className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                >
+                  {connectManually.isPending ? 'Connecting\u2026' : 'Connect number'}
+                </button>
+                <span className="text-xs text-slate-500">
+                  We will register the number and subscribe to its webhooks.
+                </span>
+              </div>
+            </form>
           )}
         </div>
       </Card>

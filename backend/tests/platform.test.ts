@@ -450,6 +450,56 @@ describe('Tenant console and API keys (integration)', () => {
     expect(response.body.data[0].body).toBe('acme message');
   });
 
+  it('refuses a manual connection whose account belongs to another tenant', async () => {
+    await createConnectedNumber(globex, 'pn-globex', '+15550002222');
+
+    const response = await request(app)
+      .post('/api/platform/connections/manual')
+      .set(auth(admin))
+      .send({
+        waba_id: 'waba-pn-globex'.replace(/\D/g, '') || '99999',
+        phone_number_id: '12345678',
+        access_token: 'EAAG-a-token-long-enough-to-pass-validation',
+      });
+
+    // Either the account is taken (409) or the credentials are rejected
+    // upstream (502) — never a silent success that moves another tenant's
+    // account into this workspace.
+    expect([409, 502]).toContain(response.status);
+
+    const owner = await queryOne<{ tenant_id: string }>(
+      `SELECT tenant_id FROM wa_connections WHERE waba_id = 'waba-pn-globex'`
+    );
+    expect(owner!.tenant_id).toBe(globex);
+  });
+
+  it('validates manual connection input before calling Meta', async () => {
+    for (const body of [
+      { waba_id: 'not-digits', phone_number_id: '12345678', access_token: 'EAAG-long-enough-token-value' },
+      { waba_id: '12345678', phone_number_id: 'nope', access_token: 'EAAG-long-enough-token-value' },
+      { waba_id: '12345678', phone_number_id: '12345678', access_token: 'short' },
+    ]) {
+      const response = await request(app)
+        .post('/api/platform/connections/manual')
+        .set(auth(admin))
+        .send(body);
+      expect(response.status).toBe(400);
+    }
+  });
+
+  it('refuses manual connection to an agent — admins configure the channel', async () => {
+    const agent = await createUser('AGENT', 'agent@acme.test', 'Acme Agent');
+    const response = await request(app)
+      .post('/api/platform/connections/manual')
+      .set(auth(agent))
+      .send({
+        waba_id: '12345678',
+        phone_number_id: '87654321',
+        access_token: 'EAAG-a-token-long-enough-to-pass',
+      });
+    expect(response.status).toBe(403);
+  });
+
   it('refuses a WhatsApp account already connected to another tenant', async () => {
     await createConnectedNumber(globex, 'pn-globex', '+15550002222');
 

@@ -64,14 +64,74 @@ function isAlreadyRegistered(error: unknown): boolean {
 }
 
 export async function completeEmbeddedSignup(input: EmbeddedSignupInput): Promise<OnboardingResult> {
-  const warnings: string[] = [];
-
-  // Step 1 — the code is single-use and short-lived, so this is attempted
-  // first and nothing is written until it succeeds.
+  // Step 1 — the code is single-use and expires in 30 seconds, so it is
+  // exchanged first and nothing is written until it succeeds.
   const token = await graph.exchangeCodeForToken(input.code);
-  const tokenPrint = fingerprint(token);
 
-  log.info({ tenantId: input.tenantId, wabaId: input.wabaId, tokenPrint }, 'exchanged signup code');
+  log.info(
+    { tenantId: input.tenantId, wabaId: input.wabaId, tokenPrint: fingerprint(token) },
+    'exchanged signup code'
+  );
+
+  return connectWithToken({ ...input, accessToken: token });
+}
+
+export interface ManualConnectInput {
+  tenantId: string;
+  wabaId: string;
+  phoneNumberId: string;
+  accessToken: string;
+  onboardedBy?: string | null;
+}
+
+/**
+ * Connects a number using credentials the business already holds.
+ *
+ * Embedded Signup is the flow for onboarding a customer who has never used
+ * the WhatsApp API. A business that already has a WhatsApp Business Account
+ * and a token — because they set it up themselves, or they are migrating from
+ * another provider — has nothing to authorise, so sending them through a
+ * consent dialog would be theatre.
+ *
+ * Both paths converge on the same code below, so a manually connected number
+ * is indistinguishable afterwards: same registration, same webhook
+ * subscription, same encrypted storage, same routing.
+ */
+export async function connectManually(input: ManualConnectInput): Promise<OnboardingResult> {
+  log.info(
+    { tenantId: input.tenantId, wabaId: input.wabaId, tokenPrint: fingerprint(input.accessToken) },
+    'manual connection requested'
+  );
+
+  // Validate before writing anything. Embedded Signup hands us a token Meta
+  // has just issued, so it is known good; a hand-entered one is the most
+  // likely thing to be wrong, and a mistyped token should produce a sentence
+  // the user can act on rather than a half-created connection.
+  try {
+    await graph.getWabaDetails(input.wabaId, input.accessToken);
+  } catch (error) {
+    if (error instanceof GraphApiError && error.isAuthFailure) {
+      throw new Error(
+        'Meta rejected that access token. Check it was copied in full and has not expired — ' +
+          'tokens generated in the API Setup panel last 24 hours.'
+      );
+    }
+    if (error instanceof GraphApiError && error.isMissingAdvancedAccess) {
+      throw new Error(
+        'The token is valid but cannot read that WhatsApp Business Account. Check the account ID, ' +
+          'and that the token belongs to a user or system user with access to it.'
+      );
+    }
+    throw new Error(`Could not reach that WhatsApp Business Account: ${describeFailure(error)}`);
+  }
+
+  return connectWithToken(input);
+}
+
+async function connectWithToken(input: ManualConnectInput): Promise<OnboardingResult> {
+  const warnings: string[] = [];
+  const token = input.accessToken;
+  const tokenPrint = fingerprint(token);
 
   // Record the connection before the remaining calls, so a failure half way
   // leaves a row an operator can see and retry rather than nothing at all.
