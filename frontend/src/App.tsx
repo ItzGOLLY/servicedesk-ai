@@ -5,6 +5,7 @@ import { LoadingBlock } from './components/ui';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import BusinessSignup from './pages/BusinessSignup';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import CreateTicket from './pages/customer/CreateTicket';
 import TicketList from './pages/TicketList';
@@ -84,6 +85,14 @@ export default function App() {
           element={
             <PublicOnly>
               <Login />
+            </PublicOnly>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <PublicOnly>
+              <BusinessSignup />
             </PublicOnly>
           }
         />

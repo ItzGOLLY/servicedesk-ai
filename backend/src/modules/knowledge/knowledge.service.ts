@@ -135,13 +135,31 @@ export interface RetrievalOutcome {
  * PostgreSQL full-text search so retrieval degrades instead of returning
  * nothing. The caller is told which path ran.
  */
-export async function retrieve(queryText: string, limit = 4): Promise<RetrievalOutcome> {
+/**
+ * Retrieves passages for a question, within one business's knowledge base.
+ *
+ * tenantId is required rather than optional: an omitted scope would silently
+ * answer one business's question from another's articles, which is the worst
+ * possible failure for this feature.
+ */
+export async function retrieve(
+  queryText: string,
+  tenantId: string,
+  limit = 4
+): Promise<RetrievalOutcome> {
   const embedded = await queryOne<{ count: string }>(
-    'SELECT COUNT(*)::TEXT AS count FROM kb_chunks WHERE embedding IS NOT NULL'
+    `SELECT COUNT(*)::TEXT AS count
+       FROM kb_chunks c JOIN kb_articles a ON a.id = c.article_id
+      WHERE c.embedding IS NOT NULL AND a.tenant_id = $1`,
+    [tenantId]
   );
 
   if (Number(embedded?.count ?? 0) === 0) {
-    return { ...(await lexicalRetrieve(queryText, limit)), embeddingUsedFallback: false, model: 'postgres-fts' };
+    return {
+      ...(await lexicalRetrieve(queryText, tenantId, limit)),
+      embeddingUsedFallback: false,
+      model: 'postgres-fts',
+    };
   }
 
   try {
@@ -161,11 +179,11 @@ export async function retrieve(queryText: string, limit = 4): Promise<RetrievalO
               (c.embedding <=> $1::vector) AS distance
          FROM kb_chunks c
          JOIN kb_articles a ON a.id = c.article_id
-        WHERE c.embedding IS NOT NULL
+        WHERE c.embedding IS NOT NULL AND a.tenant_id = $3
           AND a.is_published = TRUE
         ORDER BY c.embedding <=> $1::vector
         LIMIT $2`,
-      [literal, limit]
+      [literal, limit, tenantId]
     );
 
     return {
@@ -185,13 +203,18 @@ export async function retrieve(queryText: string, limit = 4): Promise<RetrievalO
     };
   } catch (error) {
     log.warn({ err: (error as Error).message }, 'vector retrieval failed - using lexical search');
-    return { ...(await lexicalRetrieve(queryText, limit)), embeddingUsedFallback: false, model: 'postgres-fts' };
+    return {
+      ...(await lexicalRetrieve(queryText, tenantId, limit)),
+      embeddingUsedFallback: false,
+      model: 'postgres-fts',
+    };
   }
 }
 
 /** Keyword retrieval over the GIN index, used when vectors are unavailable. */
 async function lexicalRetrieve(
   queryText: string,
+  tenantId: string,
   limit: number
 ): Promise<{ chunks: RetrievedChunk[]; usedLexicalFallback: boolean }> {
   const rows = await query<{
@@ -206,11 +229,11 @@ async function lexicalRetrieve(
                     plainto_tsquery('english', $1)) AS rank
        FROM kb_chunks c
        JOIN kb_articles a ON a.id = c.article_id
-      WHERE a.is_published = TRUE
+      WHERE a.tenant_id = $3 AND a.is_published = TRUE
         AND to_tsvector('english', c.content) @@ plainto_tsquery('english', $1)
       ORDER BY rank DESC
       LIMIT $2`,
-    [queryText, limit]
+    [queryText, limit, tenantId]
   );
 
   return {

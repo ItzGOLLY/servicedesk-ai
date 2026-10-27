@@ -126,12 +126,13 @@ usersRouter.patch(
 usersRouter.get(
   '/agents',
   requireRole('AGENT', 'ADMIN'),
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const agents = await query<UserRow>(
       `SELECT id, email, full_name, role, phone, is_active, created_at
          FROM users
-        WHERE role IN ('AGENT', 'ADMIN') AND is_active = TRUE
-        ORDER BY full_name`
+        WHERE tenant_id = $1 AND role IN ('AGENT', 'ADMIN') AND is_active = TRUE
+        ORDER BY full_name`,
+      [req.user!.tenantId]
     );
     ok(res, agents.map(toDto));
   })
@@ -147,8 +148,10 @@ usersRouter.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { role, isActive, q, page, limit } = req.query as never as z.infer<typeof listUsersSchema>;
 
-    const clauses: string[] = [];
-    const params: unknown[] = [];
+    // Seeded with the tenant so every filter below is scoped by construction,
+    // and an administrator cannot enumerate another business's users.
+    const params: unknown[] = [req.user!.tenantId];
+    const clauses: string[] = ['tenant_id = $1'];
     if (role) {
       params.push(role);
       clauses.push(`role = $${params.length}`);
@@ -161,7 +164,7 @@ usersRouter.get(
       params.push(`%${q}%`);
       clauses.push(`(full_name ILIKE $${params.length} OR email ILIKE $${params.length})`);
     }
-    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const where = `WHERE ${clauses.join(' AND ')}`;
 
     const totals = await query<{ count: string }>(
       `SELECT COUNT(*)::TEXT AS count FROM users ${where}`,
@@ -193,10 +196,10 @@ usersRouter.post(
     if (existing) throw ApiError.conflict('An account with this email address already exists.');
 
     const user = await queryOne<UserRow>(
-      `INSERT INTO users (email, password_hash, full_name, role, phone)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (tenant_id, email, password_hash, full_name, role, phone)
+       VALUES ($6, $1, $2, $3, $4, $5)
        RETURNING id, email, full_name, role, phone, is_active, created_at`,
-      [email, await hashPassword(password), fullName, role, phone ?? null]
+      [email, await hashPassword(password), fullName, role, phone ?? null, req.user!.tenantId]
     );
 
     await recordAudit(req, 'USER_CREATED', 'user', user!.id, { email, role });
@@ -210,8 +213,9 @@ usersRouter.get(
   requireRole('ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
     const user = await queryOne<UserRow>(
-      'SELECT id, email, full_name, role, phone, is_active, created_at FROM users WHERE id = $1',
-      [req.params.id]
+      `SELECT id, email, full_name, role, phone, is_active, created_at
+         FROM users WHERE id = $1 AND tenant_id = $2`,
+      [req.params.id, req.user!.tenantId]
     );
     if (!user) throw ApiError.notFound('User not found.');
 
@@ -246,9 +250,9 @@ usersRouter.patch(
     }
 
     const user = await queryOne<UserRow>(
-      `UPDATE users SET role = $1 WHERE id = $2
+      `UPDATE users SET role = $1 WHERE id = $2 AND tenant_id = $3
        RETURNING id, email, full_name, role, phone, is_active, created_at`,
-      [role, req.params.id]
+      [role, req.params.id, req.user!.tenantId]
     );
     if (!user) throw ApiError.notFound('User not found.');
 
@@ -270,9 +274,9 @@ usersRouter.patch(
     }
 
     const user = await queryOne<UserRow>(
-      `UPDATE users SET is_active = $1 WHERE id = $2
+      `UPDATE users SET is_active = $1 WHERE id = $2 AND tenant_id = $3
        RETURNING id, email, full_name, role, phone, is_active, created_at`,
-      [isActive, req.params.id]
+      [isActive, req.params.id, req.user!.tenantId]
     );
     if (!user) throw ApiError.notFound('User not found.');
 

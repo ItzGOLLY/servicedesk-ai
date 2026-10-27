@@ -33,8 +33,8 @@ export default function Landing() {
           <Link to="/login" className="btn-ghost">
             Sign in
           </Link>
-          <Link to="/register" className="btn-primary">
-            Get started
+          <Link to="/signup" className="btn-primary">
+            Connect your WhatsApp
           </Link>
         </nav>
       </header>
@@ -52,8 +52,8 @@ export default function Landing() {
               assistance so a small team can respond like a large one.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/register" className="btn-primary px-6 py-3">
-                Create an account
+              <Link to="/signup" className="btn-primary px-6 py-3">
+                Connect your WhatsApp
               </Link>
               <Link to="/login" className="btn-secondary px-6 py-3">
                 Sign in

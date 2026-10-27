@@ -46,10 +46,10 @@ categoriesRouter.get(
               COUNT(t.id)::TEXT AS ticket_count
          FROM categories c
          LEFT JOIN tickets t ON t.category_id = c.id
-        WHERE ($1::BOOLEAN OR c.is_active = TRUE)
+        WHERE c.tenant_id = $2 AND ($1::BOOLEAN OR c.is_active = TRUE)
         GROUP BY c.id
         ORDER BY c.name`,
-      [isAdmin]
+      [isAdmin, req.user!.tenantId]
     );
     ok(res, rows.map(toDto));
   })
@@ -93,9 +93,9 @@ categoriesRouter.patch(
           SET name        = COALESCE($1, name),
               description = COALESCE($2, description),
               is_active   = COALESCE($3, is_active)
-        WHERE id = $4
+        WHERE id = $4 AND tenant_id = $5
         RETURNING id, name, description, is_active, created_at`,
-      [name ?? null, description ?? null, isActive ?? null, req.params.id]
+      [name ?? null, description ?? null, isActive ?? null, req.params.id, req.user!.tenantId]
     );
     if (!row) throw ApiError.notFound('Category not found.');
 
@@ -110,8 +110,8 @@ categoriesRouter.delete(
   requireRole('ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
     const category = await queryOne<{ id: string; name: string }>(
-      'SELECT id, name FROM categories WHERE id = $1',
-      [req.params.id]
+      'SELECT id, name FROM categories WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, req.user!.tenantId]
     );
     if (!category) throw ApiError.notFound('Category not found.');
 

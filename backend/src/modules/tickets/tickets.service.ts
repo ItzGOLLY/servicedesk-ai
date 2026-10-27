@@ -95,6 +95,12 @@ function buildFilters(
     clauses.push(sql.replace('$?', `$${params.length}`));
   };
 
+  // Always first, and never derived from client input: a ticket belongs to
+  // one business, and no role — not even an administrator — may read across
+  // that boundary. Without this an admin of any workspace would list every
+  // workspace's tickets.
+  add('t.tenant_id = $?', user.tenantId);
+
   if (user.role === 'CUSTOMER') {
     add('t.customer_id = $?', user.id);
   } else if (filters.customerId) {
@@ -176,9 +182,12 @@ export async function getTicketForUser(
   ticketId: string,
   user: AuthenticatedUser
 ): Promise<TicketRow> {
+  // Scoped by tenant in the query itself rather than checked afterwards, so a
+  // ticket belonging to another business is indistinguishable from one that
+  // does not exist — the same reasoning as the customer check below.
   const ticket = await queryOne<TicketRow>(
-    `SELECT ${TICKET_SELECT} ${TICKET_FROM} WHERE t.id = $1`,
-    [ticketId]
+    `SELECT ${TICKET_SELECT} ${TICKET_FROM} WHERE t.id = $1 AND t.tenant_id = $2`,
+    [ticketId, user.tenantId]
   );
 
   if (!ticket) throw ApiError.notFound('Ticket not found.');

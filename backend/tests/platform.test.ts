@@ -4,6 +4,7 @@ import request from 'supertest';
 import {
   app,
   auth,
+  createCategory,
   createConnectedNumber,
   createTenant,
   createUser,
@@ -509,6 +510,252 @@ describe('Tenant console and API keys (integration)', () => {
       .send({ code: 'a-signup-code-value', waba_id: 'waba-pn-globex', phone_number_id: 'pn-globex' });
 
     expect(response.status).toBe(409);
+  });
+});
+
+describe('Business self-signup (integration)', () => {
+  beforeAll(async () => {
+    await migrateTestDatabase();
+  });
+
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  const signup = (body: Record<string, string>) =>
+    request(app).post('/api/auth/register-business').send(body);
+
+  const valid = {
+    businessName: 'Acme Retail',
+    fullName: 'Asha Rao',
+    email: 'asha@acme.test',
+    password: 'Password123',
+  };
+
+  it('creates a workspace with the signer as its administrator', async () => {
+    const response = await signup(valid);
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.user.role).toBe('ADMIN');
+    expect(response.body.data.workspace.slug).toBe('acme-retail');
+
+    const tenant = await queryOne<{ id: string; name: string }>(
+      `SELECT id, name FROM tenants WHERE slug = 'acme-retail'`
+    );
+    expect(tenant!.name).toBe('Acme Retail');
+
+    // The admin belongs to the new workspace, not the default one.
+    const user = await queryOne<{ tenant_id: string; role: string }>(
+      'SELECT tenant_id, role FROM users WHERE email = $1',
+      [valid.email]
+    );
+    expect(user!.tenant_id).toBe(tenant!.id);
+    expect(user!.role).toBe('ADMIN');
+  });
+
+  it('gives the new workspace its own categories, isolated from others', async () => {
+    await signup(valid);
+    await signup({ ...valid, businessName: 'Globex', email: 'ops@globex.test' });
+
+    const rows = await query<{ slug: string; count: string }>(
+      `SELECT t.slug, COUNT(c.id)::TEXT AS count
+         FROM tenants t LEFT JOIN categories c ON c.tenant_id = t.id
+        WHERE t.slug IN ('acme-retail','globex') GROUP BY t.slug ORDER BY t.slug`
+    );
+    expect(rows).toHaveLength(2);
+    for (const r of rows) expect(Number(r.count)).toBe(5);
+  });
+
+  it('does not collide when two businesses share a name', async () => {
+    await signup(valid);
+    const second = await signup({ ...valid, email: 'other@acme.test' });
+
+    expect(second.status).toBe(201);
+    expect(second.body.data.workspace.slug).toBe('acme-retail-2');
+  });
+
+  it('produces a valid slug from a name that is mostly punctuation', async () => {
+    const response = await signup({ ...valid, businessName: '!!! ???', email: 'odd@x.test' });
+    expect(response.status).toBe(201);
+    // Must satisfy the CHECK constraint on tenants.slug.
+    expect(response.body.data.workspace.slug).toMatch(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/);
+  });
+
+  it('refuses an email that already exists anywhere on the platform', async () => {
+    await signup(valid);
+    const again = await signup({ ...valid, businessName: 'Different Co' });
+    expect(again.status).toBe(409);
+
+    // The failed signup must not leave an orphan workspace behind.
+    const orphan = await queryOne(`SELECT id FROM tenants WHERE slug = 'different-co'`);
+    expect(orphan).toBeNull();
+  });
+
+  it('validates the submitted details', async () => {
+    for (const body of [
+      { ...valid, businessName: 'A' },
+      { ...valid, email: 'not-an-email' },
+      { ...valid, password: 'short1' },
+      { ...valid, password: 'nodigitshere' },
+    ]) {
+      expect((await signup(body)).status).toBe(400);
+    }
+  });
+
+  it('signs the new administrator straight in', async () => {
+    const response = await signup(valid);
+    const token = response.body.data.accessToken;
+
+    const me = await request(app).get('/api/platform/tenant').set('Authorization', `Bearer ${token}`);
+    expect(me.status).toBe(200);
+    expect(me.body.data.slug).toBe('acme-retail');
+  });
+});
+
+/**
+ * Read-path isolation.
+ *
+ * Multi-tenancy was introduced by scoping the writes; these cover the reads,
+ * which is where the gap actually was. Every one of these failed before the
+ * fix: an administrator of a new workspace could list another business's
+ * tickets, users, audit log and dashboard figures.
+ */
+describe('Cross-tenant read isolation (integration)', () => {
+  let acme: string;
+  let globex: string;
+  let acmeAdmin: TestUser;
+  let globexAdmin: TestUser;
+
+  beforeAll(async () => {
+    await migrateTestDatabase();
+  });
+
+  beforeEach(async () => {
+    await resetDatabase();
+    acme = await defaultTenantId();
+    globex = await createTenant('Globex Retail', 'globex');
+
+    acmeAdmin = await createUser('ADMIN', 'admin@acme.test', 'Acme Admin');
+    globexAdmin = await createUser('ADMIN', 'admin@globex.test', 'Globex Admin', 'Password123', globex);
+
+    const acmeCustomer = await createUser('CUSTOMER', 'buyer@acme.test', 'Acme Buyer');
+    const globexCustomer = await createUser('CUSTOMER', 'buyer@globex.test', 'Globex Buyer', 'Password123', globex);
+
+    await createCategory('Billing', acme);
+    await createCategory('Billing', globex);
+
+    await query(
+      `INSERT INTO tickets (tenant_id, customer_id, subject, description, status)
+       VALUES ($1, $2, 'Acme ticket', 'Acme description here', 'NEW'),
+              ($3, $4, 'Globex ticket', 'Globex description here', 'NEW')`,
+      [acme, acmeCustomer.id, globex, globexCustomer.id]
+    );
+  });
+
+  it('lists only the caller\u2019s own tickets', async () => {
+    const response = await request(app).get('/api/tickets').set(auth(globexAdmin));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].subject).toBe('Globex ticket');
+  });
+
+  it('returns 404 for another workspace\u2019s ticket, not 403', async () => {
+    const acmeTicket = await queryOne<{ id: string }>(
+      `SELECT id FROM tickets WHERE tenant_id = $1`,
+      [acme]
+    );
+
+    const response = await request(app)
+      .get(`/api/tickets/${acmeTicket!.id}`)
+      .set(auth(globexAdmin));
+
+    // 404 rather than 403: existence must not be disclosed across a tenant
+    // boundary any more than across a customer one.
+    expect(response.status).toBe(404);
+  });
+
+  it('counts only the caller\u2019s own tickets on the admin dashboard', async () => {
+    const response = await request(app).get('/api/dashboard/admin').set(auth(globexAdmin));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.metrics.totalTickets).toBe(1);
+  });
+
+  it('lists only the caller\u2019s own users', async () => {
+    const response = await request(app).get('/api/users').set(auth(globexAdmin));
+
+    expect(response.status).toBe(200);
+    const emails = response.body.data.map((u: { email: string }) => u.email);
+    expect(emails).toContain('admin@globex.test');
+    expect(emails).not.toContain('admin@acme.test');
+  });
+
+  it('offers only the caller\u2019s own agents for assignment', async () => {
+    const response = await request(app).get('/api/users/agents').set(auth(globexAdmin));
+
+    expect(response.status).toBe(200);
+    const emails = response.body.data.map((u: { email: string }) => u.email);
+    expect(emails).not.toContain('admin@acme.test');
+  });
+
+  it('lists only the caller\u2019s own categories', async () => {
+    const response = await request(app).get('/api/categories').set(auth(globexAdmin));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+  });
+
+  it('reports only the caller\u2019s own figures', async () => {
+    const byStatus = await request(app)
+      .get('/api/reports/tickets-by-status')
+      .set(auth(globexAdmin));
+
+    expect(byStatus.status).toBe(200);
+    const total = byStatus.body.data.reduce(
+      (sum: number, row: { count: number }) => sum + row.count,
+      0
+    );
+    expect(total).toBe(1);
+  });
+
+  it('exports only the caller\u2019s own tickets as CSV', async () => {
+    const response = await request(app)
+      .get('/api/reports/export?format=csv')
+      .set(auth(acmeAdmin));
+
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('Acme ticket');
+    expect(response.text).not.toContain('Globex ticket');
+  });
+
+  it('shows only the caller\u2019s own audit entries', async () => {
+    // Each admin performs an auditable action in their own workspace.
+    await request(app).post('/api/categories').set(auth(acmeAdmin)).send({ name: 'Acme Only' });
+    await request(app).post('/api/categories').set(auth(globexAdmin)).send({ name: 'Globex Only' });
+
+    const response = await request(app).get('/api/audit-logs').set(auth(globexAdmin));
+
+    expect(response.status).toBe(200);
+    const names = JSON.stringify(response.body.data);
+    expect(names).toContain('Globex Only');
+    expect(names).not.toContain('Acme Only');
+  });
+
+  it('keeps knowledge-base retrieval within one workspace', async () => {
+    await request(app)
+      .post('/api/knowledge')
+      .set(auth(acmeAdmin))
+      .send({ title: 'Acme refund policy', body: 'Acme refunds take five working days to process.' });
+
+    // Globex has no articles, so a query matching Acme's must return nothing.
+    const response = await request(app)
+      .post('/api/knowledge/search')
+      .set(auth(globexAdmin))
+      .send({ query: 'refund working days' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.results).toHaveLength(0);
   });
 });
 

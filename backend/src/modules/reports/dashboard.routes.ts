@@ -31,8 +31,8 @@ dashboardRouter.get(
               COUNT(*) FILTER (WHERE status IN ('NEW','OPEN','IN_PROGRESS'))::TEXT AS open,
               COUNT(*) FILTER (WHERE status IN ('RESOLVED','CLOSED'))::TEXT       AS resolved,
               COUNT(*) FILTER (WHERE status = 'WAITING_FOR_CUSTOMER')::TEXT       AS waiting
-         FROM tickets WHERE customer_id = $1`,
-      [req.user!.id]
+         FROM tickets WHERE tenant_id = $2 AND customer_id = $1`,
+      [req.user!.id, req.user!.tenantId]
     );
 
     const recent = await query<{
@@ -44,7 +44,7 @@ dashboardRouter.get(
       created_at: Date;
     }>(
       `SELECT id, reference, subject, status, priority, created_at
-         FROM tickets WHERE customer_id = $1
+         FROM tickets WHERE tenant_id = $2 AND customer_id = $1
         ORDER BY created_at DESC LIMIT 5`,
       [req.user!.id]
     );
@@ -93,24 +93,24 @@ dashboardRouter.get(
                             AND status IN ('RESOLVED','CLOSED'))::TEXT AS resolved,
          COUNT(*) FILTER (WHERE assigned_agent_id IS NULL
                             AND status NOT IN ('RESOLVED','CLOSED'))::TEXT AS unassigned
-       FROM tickets`,
-      [agentId]
+       FROM tickets WHERE tenant_id = $2`,
+      [agentId, req.user!.tenantId]
     );
 
     // Averaged over this agent's resolved tickets only; NULL when they have none.
     const resolution = await queryOne<{ avg_hours: string | null }>(
       `SELECT ROUND(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600)::NUMERIC, 1)::TEXT AS avg_hours
          FROM tickets
-        WHERE assigned_agent_id = $1 AND resolved_at IS NOT NULL`,
-      [agentId]
+        WHERE tenant_id = $2 AND assigned_agent_id = $1 AND resolved_at IS NOT NULL`,
+      [agentId, req.user!.tenantId]
     );
 
     const byCategory = await query<{ name: string; count: string }>(
       `SELECT COALESCE(c.name, 'Uncategorised') AS name, COUNT(*)::TEXT AS count
          FROM tickets t LEFT JOIN categories c ON c.id = t.category_id
-        WHERE t.assigned_agent_id = $1
+        WHERE t.tenant_id = $2 AND t.assigned_agent_id = $1
         GROUP BY c.name ORDER BY COUNT(*) DESC`,
-      [agentId]
+      [agentId, req.user!.tenantId]
     );
 
     const queue = await query<{
@@ -125,10 +125,11 @@ dashboardRouter.get(
       `SELECT t.id, t.reference, t.subject, t.status, t.priority,
               u.full_name AS customer_name, t.created_at
          FROM tickets t JOIN users u ON u.id = t.customer_id
-        WHERE t.assigned_agent_id = $1 AND t.status NOT IN ('RESOLVED','CLOSED')
+        WHERE t.tenant_id = $2 AND t.assigned_agent_id = $1
+          AND t.status NOT IN ('RESOLVED','CLOSED')
         ORDER BY t.priority DESC, t.created_at ASC
         LIMIT 8`,
-      [agentId]
+      [agentId, req.user!.tenantId]
     );
 
     ok(res, {
@@ -158,7 +159,8 @@ dashboardRouter.get(
 dashboardRouter.get(
   '/admin',
   requireRole('ADMIN'),
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = req.user!.tenantId;
     const counts = await queryOne<{
       total: string;
       open: string;
@@ -169,57 +171,76 @@ dashboardRouter.get(
       whatsapp_tickets: string;
     }>(
       `SELECT
-         (SELECT COUNT(*)::TEXT FROM tickets) AS total,
-         (SELECT COUNT(*)::TEXT FROM tickets WHERE status IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_CUSTOMER')) AS open,
-         (SELECT COUNT(*)::TEXT FROM tickets WHERE status IN ('RESOLVED','CLOSED')) AS resolved,
-         (SELECT COUNT(*)::TEXT FROM tickets WHERE assigned_agent_id IS NULL AND status NOT IN ('RESOLVED','CLOSED')) AS unassigned,
-         (SELECT COUNT(*)::TEXT FROM users WHERE role = 'CUSTOMER' AND is_active) AS customers,
-         (SELECT COUNT(*)::TEXT FROM users WHERE role IN ('AGENT','ADMIN') AND is_active) AS agents,
-         (SELECT COUNT(*)::TEXT FROM tickets WHERE channel = 'WHATSAPP') AS whatsapp_tickets`
+         (SELECT COUNT(*)::TEXT FROM tickets WHERE tenant_id = $1) AS total,
+         (SELECT COUNT(*)::TEXT FROM tickets WHERE tenant_id = $1 AND status IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_CUSTOMER')) AS open,
+         (SELECT COUNT(*)::TEXT FROM tickets WHERE tenant_id = $1 AND status IN ('RESOLVED','CLOSED')) AS resolved,
+         (SELECT COUNT(*)::TEXT FROM tickets WHERE tenant_id = $1 AND assigned_agent_id IS NULL AND status NOT IN ('RESOLVED','CLOSED')) AS unassigned,
+         (SELECT COUNT(*)::TEXT FROM users WHERE tenant_id = $1 AND role = 'CUSTOMER' AND is_active) AS customers,
+         (SELECT COUNT(*)::TEXT FROM users WHERE tenant_id = $1 AND role IN ('AGENT','ADMIN') AND is_active) AS agents,
+         (SELECT COUNT(*)::TEXT FROM tickets WHERE tenant_id = $1 AND channel = 'WHATSAPP') AS whatsapp_tickets`,
+      [tenantId]
     );
 
     const resolution = await queryOne<{ avg_hours: string | null }>(
       `SELECT ROUND(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600)::NUMERIC, 1)::TEXT AS avg_hours
-         FROM tickets WHERE resolved_at IS NOT NULL`
+         FROM tickets WHERE tenant_id = $1 AND resolved_at IS NOT NULL`,
+      [tenantId]
     );
 
     const [byStatus, byPriority, byCategory, bySentiment, workload, trend, aiStats] =
       await Promise.all([
         query<{ label: string; count: string }>(
-          `SELECT status::TEXT AS label, COUNT(*)::TEXT AS count FROM tickets GROUP BY status ORDER BY status`
+          `SELECT status::TEXT AS label, COUNT(*)::TEXT AS count
+             FROM tickets WHERE tenant_id = $1 GROUP BY status ORDER BY status`,
+          [tenantId]
         ),
         query<{ label: string; count: string }>(
-          `SELECT priority::TEXT AS label, COUNT(*)::TEXT AS count FROM tickets GROUP BY priority ORDER BY priority`
+          `SELECT priority::TEXT AS label, COUNT(*)::TEXT AS count
+             FROM tickets WHERE tenant_id = $1 GROUP BY priority ORDER BY priority`,
+          [tenantId]
         ),
         query<{ label: string; count: string }>(
           `SELECT COALESCE(c.name, 'Uncategorised') AS label, COUNT(*)::TEXT AS count
              FROM tickets t LEFT JOIN categories c ON c.id = t.category_id
-            GROUP BY c.name ORDER BY COUNT(*) DESC`
+            WHERE t.tenant_id = $1
+            GROUP BY c.name ORDER BY COUNT(*) DESC`,
+          [tenantId]
         ),
         query<{ label: string; count: string }>(
           `SELECT COALESCE(sentiment::TEXT, 'UNCLASSIFIED') AS label, COUNT(*)::TEXT AS count
-             FROM tickets GROUP BY sentiment ORDER BY COUNT(*) DESC`
+             FROM tickets WHERE tenant_id = $1 GROUP BY sentiment ORDER BY COUNT(*) DESC`,
+          [tenantId]
         ),
         query<{ name: string; open: string; resolved: string }>(
           `SELECT u.full_name AS name,
                   COUNT(t.id) FILTER (WHERE t.status NOT IN ('RESOLVED','CLOSED'))::TEXT AS open,
                   COUNT(t.id) FILTER (WHERE t.status IN ('RESOLVED','CLOSED'))::TEXT AS resolved
-             FROM users u LEFT JOIN tickets t ON t.assigned_agent_id = u.id
-            WHERE u.role IN ('AGENT','ADMIN') AND u.is_active
-            GROUP BY u.id, u.full_name ORDER BY COUNT(t.id) DESC`
+             FROM users u LEFT JOIN tickets t
+               ON t.assigned_agent_id = u.id AND t.tenant_id = $1
+            WHERE u.tenant_id = $1 AND u.role IN ('AGENT','ADMIN') AND u.is_active
+            GROUP BY u.id, u.full_name ORDER BY COUNT(t.id) DESC`,
+          [tenantId]
         ),
         // generate_series fills days with no tickets, so the chart has no gaps
         query<{ day: string; count: string }>(
           `SELECT TO_CHAR(d.day, 'YYYY-MM-DD') AS day, COUNT(t.id)::TEXT AS count
              FROM generate_series(CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE, '1 day') AS d(day)
-             LEFT JOIN tickets t ON DATE(t.created_at) = d.day
-            GROUP BY d.day ORDER BY d.day`
+             LEFT JOIN tickets t
+               ON DATE(t.created_at) = d.day AND t.tenant_id = $1
+            GROUP BY d.day ORDER BY d.day`,
+          [tenantId]
         ),
         queryOne<{ classified: string; fallback: string; ai_replies: string }>(
           `SELECT
-             (SELECT COUNT(*)::TEXT FROM tickets WHERE ai_classified_at IS NOT NULL) AS classified,
-             (SELECT COUNT(*)::TEXT FROM ai_suggestions WHERE used_fallback = TRUE) AS fallback,
-             (SELECT COUNT(*)::TEXT FROM ticket_messages WHERE ai_assisted = TRUE) AS ai_replies`
+             (SELECT COUNT(*)::TEXT FROM tickets
+               WHERE tenant_id = $1 AND ai_classified_at IS NOT NULL) AS classified,
+             (SELECT COUNT(*)::TEXT FROM ai_suggestions s
+               JOIN tickets t ON t.id = s.ticket_id
+               WHERE t.tenant_id = $1 AND s.used_fallback = TRUE) AS fallback,
+             (SELECT COUNT(*)::TEXT FROM ticket_messages m
+               JOIN tickets t ON t.id = m.ticket_id
+               WHERE t.tenant_id = $1 AND m.ai_assisted = TRUE) AS ai_replies`,
+          [tenantId]
         ),
       ]);
 
