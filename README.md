@@ -13,11 +13,11 @@ Businesses sign themselves up, connect their own WhatsApp Business number — th
 
 See [`docs/PLATFORM_ARCHITECTURE.md`](docs/PLATFORM_ARCHITECTURE.md) and [`docs/META_APPROVAL_PATH.md`](docs/META_APPROVAL_PATH.md).
 
-Built for **BCSE408L – Cloud Computing**, School of Computer Science Engineering and Information Systems, VIT Chennai (AY 2026–2027).
+Built for **Cloud Computing Project**
 
 | | |
 |---|---|
-| **Project** | Project 19 — ServiceDesk AI |
+| **Project** | ServiceDesk AI |
 | **SaaS Category** | Customer Support SaaS |
 | **Problem Statement** | Manage customer complaints and automate ticket handling |
 | **Target Users** | Customer · Support Agent · Admin |
@@ -53,14 +53,6 @@ offers both onboarding routes plus a setup guide.
 These are demonstration accounts created for evaluation. They are not personal
 passwords and are unrelated to any other account.
 
----
-
-## Team
-
-| Name | Registration No. |
-|---|---|
-| Aarush Jagannathan | 23BLC1211 |
-| Gomatheswar M | 23BLC1195 |
 
 ---
 
